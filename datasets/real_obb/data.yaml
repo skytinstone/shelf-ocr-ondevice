@@ -1,0 +1,5 @@
+path: /Users/minseok/Downloads/shelf_ocr_test/datasets/real_obb
+train: images/train
+val: images/val
+names:
+  0: spine

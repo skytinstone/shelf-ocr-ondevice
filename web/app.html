@@ -1,0 +1,2503 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<script>
+function isMobileOrTablet() {
+  /* 터치 기기 + 모바일/태블릿 UA(iPadOS 포함) + 화면 긴 변 1400px 이하만 허용 (브라우저 쪽 판별: 보안 장치가 아니라 사용 환경 제한) */
+  var ua = navigator.userAgent || "", tp = navigator.maxTouchPoints || 0;
+  var touch = tp > 0 || "ontouchstart" in window;
+  var coarse = !!(window.matchMedia && matchMedia("(pointer: coarse)").matches);
+  var mobileUA = /Android|iPhone|iPad|iPod|Mobile|Tablet|Silk|Kindle/i.test(ua) || (/Macintosh/.test(ua) && tp > 1);
+  var longSide = Math.max(screen.width, screen.height), shortSide = Math.min(screen.width, screen.height);
+  return touch && coarse && mobileUA && longSide <= 1400 && shortSide <= 1100;
+}
+if (!isMobileOrTablet()) { if (window.stop) window.stop(); location.replace("./"); }
+</script>
+<title>On-Device 책 권수·제목 추출 시스템 (밀리의 서재 사전과제 · 신민석)</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;600;700&display=swap">
+<style>
+/* Layout: 단일 열 계측기 화면. 상단 기기 정보 → 실행 → 결과표 → 실사진 검출 */
+:root {
+  --bg: #f3f5f7; --panel: #ffffff; --ink: #17202b; --sub: #5d6876; --line: #d8dee6;
+  --acc: #0f5f73; --acc-ink: #ffffff; --ok: #1f7a4d; --bad: #b3261e; --box: #12a36b; --warn: #d4870f; --ca: #d32f2f; --cb: #1f5fd1;
+  --f-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 720px; margin: 0 auto; padding-block: 18px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.wrap > * { min-width: 0; }
+h1 { font-size: 1.35rem; margin: 0; text-wrap: balance; display: grid; gap: 2px; }
+.brand { font-size: .78rem; font-weight: 600; color: var(--sub); letter-spacing: .04em; }
+h2 { font-size: 1rem; margin: 0 0 8px; }
+.who { margin: 2px 0 0; font-weight: 600; color: var(--acc); font-size: .92rem; }
+.lede { color: var(--sub); margin: 4px 0 0; font-size: .92rem; }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; min-width: 0; }
+.kv { display: grid; grid-template-columns: minmax(0, 7.2em) minmax(0, 1fr); gap: 8px 12px; font-size: .88rem; align-items: start; }
+.kv dt { color: var(--sub); min-width: 0; overflow-wrap: anywhere; } .kv dd { margin: 0; min-width: 0; font-family: var(--f-mono); overflow-wrap: anywhere; word-break: break-word; }
+button, .file-btn { font: 600 .95rem var(--f-body); border: 0; border-radius: 8px; padding: 11px 16px; background: var(--acc); color: var(--acc-ink); cursor: pointer; }
+button.ghost, .file-btn.ghost { background: transparent; color: var(--acc); border: 1px solid var(--acc); }
+button:disabled { opacity: .45; cursor: default; }
+button:focus-visible, .file-btn:focus-within { outline: 3px solid var(--acc); outline-offset: 2px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.status { font-family: var(--f-mono); font-size: .82rem; color: var(--sub); min-height: 1.2em; }
+.tbl { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: .86rem; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--sub); font-weight: 600; font-size: .78rem; letter-spacing: .02em; }
+td.n { text-align: right; font-family: var(--f-mono); }
+.pill { display: inline-block; font-size: .74rem; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.ok { color: var(--ok); } .bad { color: var(--bad); }
+.big { font-family: var(--f-mono); font-size: 1.6rem; font-weight: 600; }
+.est { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.est div { border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.est small { color: var(--sub); display: block; font-size: .78rem; }
+canvas { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); }
+.note { font-size: .8rem; color: var(--sub); margin: 8px 0 0; }
+.file-btn input { display: none; }
+.hint { margin: -2px 0 10px; font-size: .8rem; color: var(--sub); }
+.fields { display: grid; gap: 8px; }
+.field { display: grid; grid-template-columns: 5.5em minmax(0, 1fr); align-items: center; gap: 10px; font-size: .9rem; }
+.field span { color: var(--sub); }
+.picked { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 12px; }
+.picked div { background: var(--bg); border-radius: 8px; padding: 7px 9px; min-width: 0; }
+.picked small { display: block; font-size: .72rem; color: var(--sub); }
+.picked b { font-size: .88rem; font-weight: 600; overflow-wrap: anywhere; }
+.picked b.empty { color: var(--sub); font-weight: 400; }
+.warn { margin: 8px 0 0; font-size: .8rem; color: var(--bad); }
+.rtline { margin: 10px 0 0; font-size: .76rem; color: var(--sub); display: flex; align-items: center; gap: 6px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); display: inline-block; }
+.dot.ready { background: var(--ok); } .dot.err { background: var(--bad); }
+.lockmsg { display: none; margin: 0 0 8px; font-size: .84rem; font-weight: 600; color: var(--acc); }
+.step.locked .lockmsg { display: block; }
+.step.locked > :not(h2):not(.lockmsg) { opacity: .4; pointer-events: none; user-select: none; }
+.tabs3 { grid-template-columns: repeat(3, 1fr); }
+.tabs4 { grid-template-columns: repeat(2, 1fr); }
+.tabs4 .tab { font-size: .86rem; padding: 9px 4px; }
+.tabs4 .tab:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+.eviews .tab { font-size: .8rem; }
+.cvcap { font-size: .8rem; color: var(--sub); margin: 6px 0 0; }
+.blist .kind { font-size: .72rem; color: var(--sub); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; margin-left: 6px; font-weight: 500; white-space: nowrap; }
+.blist .t.ocr { color: #1f5fd1; font-weight: 600; }
+.legend2 { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: .78rem; color: var(--sub); margin: 6px 0 0; }
+.legend2 i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; }
+.tabs3 .tab { font-size: .84rem; padding: 9px 4px; }
+.legend { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: .8rem; color: var(--sub); margin: 2px 0 6px; }
+.legend span { display: inline-block; width: 22px; height: 3px; border-radius: 2px; margin-left: 6px; }
+.legend .la { background: var(--ca); } .legend .lb { background: var(--cb); }
+.chart { width: 100%; }
+.chart svg { display: block; width: 100%; height: auto; }
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; margin: 10px 0 8px; }
+.tab { border-radius: 0; background: var(--panel); color: var(--sub); font-weight: 600; padding: 10px 8px; }
+.tab.on { background: var(--acc); color: var(--acc-ink); }
+.cmp { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; font-size: .82rem; font-variant-numeric: tabular-nums; }
+.cmp div { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.cmp div.on { border-color: var(--acc); }
+.cmp b { display: block; font-size: .82rem; color: var(--ink); margin-bottom: 6px; }
+.cmp div.on b { color: var(--acc); }
+.kv2 { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 8px; margin: 0; font-size: .78rem; }
+.kv2 dt { color: var(--sub); min-width: 0; } .kv2 dd { margin: 0; font-family: var(--f-mono); font-weight: 600; text-align: right; }
+.mdesc { font-size: .8rem; color: var(--sub); margin: 8px 0; }
+.spec { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 4px 10px; margin: 0 0 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: .82rem; }
+.spec dt { color: var(--sub); }
+.spec dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+.spec .h { grid-column: 1 / -1; font-weight: 700; color: var(--acc); }
+.modal[hidden] { display: none !important; }
+.modal { position: fixed; inset: 0; background: rgba(20, 28, 38, .45); display: grid; place-items: center; z-index: 50; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.mcard { background: var(--panel); border-radius: 14px; padding: 20px 18px; width: min(360px, 100%); display: grid; gap: 10px; box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+.mcard b { font-size: 1.05rem; line-height: 1.45; white-space: pre-line; text-align: center; }
+.mcard p { margin: 0; color: var(--sub); font-size: .84rem; min-height: 2.6em; text-align: center; }
+.bar { height: 6px; border-radius: 99px; background: #d9dde3; overflow: hidden; margin-top: 4px; }
+.bar i { display: block; height: 100%; width: 0%; border-radius: 99px; background: #1d1d1f; }
+#pmTime { font-family: var(--f-mono); font-size: .76rem; color: var(--sub); text-align: center; }
+.logbox { margin: 12px 0 0; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: .82rem; }
+.logbox summary { cursor: pointer; color: var(--sub); font-weight: 600; }
+.logbox pre { margin: 8px 0 6px; max-height: 260px; overflow: auto; white-space: pre-wrap; word-break: break-all; font-family: var(--f-mono); font-size: .72rem; line-height: 1.45; background: #f6f7f9; border-radius: 6px; padding: 8px; }
+.logbox .err { color: var(--bad); }
+#pmPct { font-family: var(--f-mono); font-size: .78rem; color: var(--sub); text-align: center; }
+.sum { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0 6px; }
+.sum div { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.sum small { display: block; color: var(--sub); font-size: .76rem; }
+.sum b { font-family: var(--f-mono); font-size: 1.35rem; }
+.blist { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.blist li { display: grid; grid-template-columns: 2.2em 1fr; gap: 6px; padding: 7px 4px; border-bottom: 1px solid var(--line); min-width: 0; }
+.blist .no { font-family: var(--f-mono); color: var(--sub); text-align: right; }
+.blist .t { min-width: 0; overflow-wrap: anywhere; }
+.blist .t.ok { color: var(--ink); font-weight: 600; }
+.blist .t.unk { color: var(--sub); }
+.ftabs { margin: 12px 0 4px; }
+.ftabs .tab b { font-family: var(--f-mono); margin-left: 4px; font-weight: 700; }
+.fempty { color: var(--sub); font-size: .88rem; padding: 10px 4px; }
+.blist .cand { display: block; font-size: .78rem; color: var(--sub); font-weight: 400; }
+.dev { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.dev div { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+.dev small { display: block; color: var(--sub); font-size: .76rem; }
+.dev b { font-size: 1.02rem; overflow-wrap: anywhere; }
+select { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; width: 100%; max-width: 100%; min-width: 0; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1><small class="brand">사전과제 데모 · 비공식</small><span>On-Device 책 권수/제목 추출 시스템</span></h1>
+    <p class="who">AI 엔지니어 사전과제 · 지원자 신민석</p>
+    <p class="lede">On-Device 환경에서 책장 이미지를 업로드하여, 책장에 꽂혀 있는 책들의 권 수와 책 제목들을 인식할 수 있는 시스템을 구성하였습니다.<br>※ 사진은 서버로 전송하거나 저장되지 않습니다.</p>
+  </header>
+
+  <section>
+    <h2>1. 기기 선택</h2>
+    <p class="hint" id="autoHint" hidden></p>
+    <div class="fields">
+      <label class="field" for="dPick"><span>사용 기기</span><select id="dPick"><option value="">기기를 선택하세요</option></select></label>
+      <label class="field" for="dFold"><span>스마트폰<br>타입</span><select id="dFold">
+        <option value="">타입을 선택해주세요</option><option value="bar">바형 (일반 스마트폰)</option><option value="foldable">폴더블 폰</option><option value="tablet">태블릿</option></select></label>
+    </div>
+    <div class="picked">
+      <div><small>운영체제</small><b id="dOs">선택 전</b></div>
+      <div><small>기기 종류</small><b id="dType">선택 전</b></div>
+      <div><small>모델</small><b id="dModel">선택 전</b></div>
+      <div><small>칩셋 · RAM</small><b id="dSpec">선택 전</b></div>
+    </div>
+    <p class="warn" id="dWarn" hidden></p>
+    <p class="rtline"><span class="dot" id="rtdot"></span>런타임 ONNX Runtime Web · <span id="rtstate">준비 중</span></p>
+  </section>
+
+  <section class="step locked" id="sec2">
+    <h2>2. 책 제목 및 권수 추출 시스템</h2>
+    <p class="lockmsg">먼저 1. 기기 선택을 완료해 주세요.</p>
+    <div class="row">
+      <label class="file-btn">사진 찍기<input id="cam" type="file" accept="image/*" capture="environment"></label>
+      <label class="file-btn ghost">보관함에서 선택<input id="lib" type="file" accept="image/*"></label>
+      <button id="reset1" type="button" class="ghost">초기화</button>
+    </div>
+    <p class="status" id="dst">사진을 넣으면 최종모델(E)로 인식합니다. 다른 모델 탭을 누르면 같은 사진을 그 모델로 인식해 비교합니다.</p>
+    <div id="abWrap" hidden>
+      <div class="tabs tabs4" role="tablist">
+        <button type="button" role="tab" id="tabA" class="tab" aria-selected="false">초기모델(A)</button>
+        <button type="button" role="tab" id="tabB" class="tab" aria-selected="false">개선모델(B)</button>
+        <button type="button" role="tab" id="tabD" class="tab" aria-selected="false">PaddleOCR(D)</button>
+        <button type="button" role="tab" id="tabE" class="tab on" aria-selected="true">최종모델(E)</button>
+      </div>
+      <dl class="spec" id="spec"></dl>
+      <div class="cmp" id="cmp"></div>
+    </div>
+    <div class="tabs tabs3 eviews" id="eViews" role="tablist" aria-label="최종모델 단계 보기" hidden>
+      <button type="button" role="tab" class="tab" id="ev1" aria-selected="false">Step 1 · 책 검출</button>
+      <button type="button" role="tab" class="tab" id="ev2" aria-selected="false">Step 2 · 글자 검출</button>
+      <button type="button" role="tab" class="tab on" id="ev3" aria-selected="true">최종 결과</button>
+    </div>
+    <canvas id="cv" width="1280" height="720" hidden></canvas>
+    <p class="cvcap" id="cvCap" hidden></p>
+    <div class="legend2" id="cvLeg" hidden></div>
+    <div id="res" hidden>
+      <div class="sum">
+        <div><small>감지된 책</small><b id="rCount">-</b></div>
+        <div><small>제목 확인</small><b id="rOk">-</b></div>
+        <div><small>제목 미인식</small><b id="rNo">-</b></div>
+      </div>
+      <div class="tabs tabs3 ftabs" role="tablist" aria-label="결과 필터">
+        <button type="button" role="tab" class="tab on" id="f_all" aria-selected="true">전체<b id="fnAll">0</b></button>
+        <button type="button" role="tab" class="tab" id="f_ok" aria-selected="false">제목 확인<b id="fnOk">0</b></button>
+        <button type="button" role="tab" class="tab" id="f_no" aria-selected="false">제목 미인식<b id="fnNo">0</b></button>
+      </div>
+      <ol id="rList" class="blist"></ol>
+      <p class="fempty" id="fEmpty" hidden></p>
+      <p class="note" id="noteMain">제목 미인식은 책등에 글자가 없는 제본 책이거나, 글자를 읽었지만 확신이 부족해 확정하지 않은 책입니다. 서비스에서는 후보를 보여주고 사용자가 고르게 합니다. 데모 카탈로그는 도서 138권입니다. 최종모델(E)은 카탈로그에 없는 책도 글자로 읽은 제목을 파란색으로 보여 줍니다.</p>
+    </div>
+    <details class="logbox" id="logBox" hidden>
+      <summary>실행 로그 (시작 시각 · 경과 시간 · 오류)</summary>
+      <pre id="logPre"></pre>
+      <button type="button" class="ghost" id="logCopy">로그 복사</button>
+    </details>
+  </section>
+
+  <section class="step locked" id="sec3" hidden>
+    <h2>3. 처리 시간 측정</h2>
+    <p class="lockmsg">먼저 1. 기기 선택을 완료해 주세요.</p>
+    <div class="row">
+      <button id="run" type="button" disabled>측정 시작</button>
+      <button id="copy" type="button" class="ghost" disabled>결과 복사</button>
+      <button id="reset2" type="button" class="ghost">초기화</button>
+    </div>
+    <p class="status" id="st">모델을 불러오는 중입니다.</p>
+    <div class="est" id="est" hidden>
+      <div><small>사진 1장 처리 · 초기모델(A) 실측</small><span class="big" id="estFull">-</span></div>
+      <div><small>사진 1장 처리 · 개선모델(B) 실측</small><span class="big" id="estEarly">-</span></div>
+      <div><small>인식 결과 서버와 일치</small><span class="big" id="match">-</span></div>
+    </div>
+    <div id="chartWrap" hidden>
+      <div class="tabs tabs3" role="tablist">
+        <button type="button" role="tab" class="tab on" id="ct0" aria-selected="true">검출 시간</button>
+        <button type="button" role="tab" class="tab" id="ct1" aria-selected="false">책 1권 인식</button>
+        <button type="button" role="tab" class="tab" id="ct2" aria-selected="false">사진 1장 누적</button>
+      </div>
+      <div class="legend"><span class="la"></span>초기모델(A) <span class="lb"></span>개선모델(B)</div>
+      <div class="chart" id="chart"></div>
+      <p class="mdesc" id="chartDesc"></p>
+    </div>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>모델</th><th>용량</th><th class="n">로드</th><th class="n">중앙값</th><th class="n">p95</th><th>비고</th></tr></thead>
+        <tbody id="tb"><tr><td colspan="6" style="color:var(--sub)">측정 시작을 누르면 모델별 처리 시간과 A·B 모델의 실제 처리 과정을 측정합니다. 약 2~3분 걸립니다.</td></tr></tbody>
+      </table>
+    </div>
+    <p class="status" id="saved"></p>
+    <p class="note">브라우저 WASM은 CPU에서만 실행되고 Neural Engine을 쓰지 않습니다. 앱에서 Core ML로 실행하면 이보다 빨라지므로, 이 값은 처리 시간의 보수적 상한으로 봅니다.</p>
+  </section>
+
+</div>
+
+<div class="modal" id="pm" hidden role="dialog" aria-modal="true" aria-labelledby="pmTitle">
+  <div class="mcard">
+    <b id="pmTitle">처리 중</b>
+    <p id="pmStep">준비 중</p>
+    <div class="bar"><i id="pmBar"></i></div>
+    <span id="pmPct">0%</span>
+    <span id="pmTime"></span>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort.wasm.min.js"></script>
+<script>
+// rten WASM 런타임 (rusto-rten-wasm 0.3.1, MIT) — PP-OCRv5 인식기 실행용
+window.RTEN = (() => {
+let wasm;
+
+let cachedUint8ArrayMemory0 = null;
+
+function getUint8ArrayMemory0() {
+    if (cachedUint8ArrayMemory0 === null || cachedUint8ArrayMemory0.byteLength === 0) {
+        cachedUint8ArrayMemory0 = new Uint8Array(wasm.memory.buffer);
+    }
+    return cachedUint8ArrayMemory0;
+}
+
+let cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true, fatal: true });
+
+cachedTextDecoder.decode();
+
+const MAX_SAFARI_DECODE_BYTES = 2146435072;
+let numBytesDecoded = 0;
+function decodeText(ptr, len) {
+    numBytesDecoded += len;
+    if (numBytesDecoded >= MAX_SAFARI_DECODE_BYTES) {
+        cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true, fatal: true });
+        cachedTextDecoder.decode();
+        numBytesDecoded = len;
+    }
+    return cachedTextDecoder.decode(getUint8ArrayMemory0().subarray(ptr, ptr + len));
+}
+
+function getStringFromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return decodeText(ptr, len);
+}
+
+let heap = new Array(128).fill(undefined);
+
+heap.push(undefined, null, true, false);
+
+let heap_next = heap.length;
+
+function addHeapObject(obj) {
+    if (heap_next === heap.length) heap.push(heap.length + 1);
+    const idx = heap_next;
+    heap_next = heap[idx];
+
+    heap[idx] = obj;
+    return idx;
+}
+
+let WASM_VECTOR_LEN = 0;
+
+function passArray8ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 1, 1) >>> 0;
+    getUint8ArrayMemory0().set(arg, ptr / 1);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
+}
+
+let cachedDataViewMemory0 = null;
+
+function getDataViewMemory0() {
+    if (cachedDataViewMemory0 === null || cachedDataViewMemory0.buffer.detached === true || (cachedDataViewMemory0.buffer.detached === undefined && cachedDataViewMemory0.buffer !== wasm.memory.buffer)) {
+        cachedDataViewMemory0 = new DataView(wasm.memory.buffer);
+    }
+    return cachedDataViewMemory0;
+}
+
+function getObject(idx) { return heap[idx]; }
+
+function dropObject(idx) {
+    if (idx < 132) return;
+    heap[idx] = heap_next;
+    heap_next = idx;
+}
+
+function takeObject(idx) {
+    const ret = getObject(idx);
+    dropObject(idx);
+    return ret;
+}
+
+const cachedTextEncoder = new TextEncoder();
+
+if (!('encodeInto' in cachedTextEncoder)) {
+    cachedTextEncoder.encodeInto = function (arg, view) {
+        const buf = cachedTextEncoder.encode(arg);
+        view.set(buf);
+        return {
+            read: arg.length,
+            written: buf.length
+        };
+    }
+}
+
+function passStringToWasm0(arg, malloc, realloc) {
+
+    if (realloc === undefined) {
+        const buf = cachedTextEncoder.encode(arg);
+        const ptr = malloc(buf.length, 1) >>> 0;
+        getUint8ArrayMemory0().subarray(ptr, ptr + buf.length).set(buf);
+        WASM_VECTOR_LEN = buf.length;
+        return ptr;
+    }
+
+    let len = arg.length;
+    let ptr = malloc(len, 1) >>> 0;
+
+    const mem = getUint8ArrayMemory0();
+
+    let offset = 0;
+
+    for (; offset < len; offset++) {
+        const code = arg.charCodeAt(offset);
+        if (code > 0x7F) break;
+        mem[ptr + offset] = code;
+    }
+
+    if (offset !== len) {
+        if (offset !== 0) {
+            arg = arg.slice(offset);
+        }
+        ptr = realloc(ptr, len, len = offset + arg.length * 3, 1) >>> 0;
+        const view = getUint8ArrayMemory0().subarray(ptr + offset, ptr + len);
+        const ret = cachedTextEncoder.encodeInto(arg, view);
+
+        offset += ret.written;
+        ptr = realloc(ptr, len, offset, 1) >>> 0;
+    }
+
+    WASM_VECTOR_LEN = offset;
+    return ptr;
+}
+
+let cachedFloat32ArrayMemory0 = null;
+
+function getFloat32ArrayMemory0() {
+    if (cachedFloat32ArrayMemory0 === null || cachedFloat32ArrayMemory0.byteLength === 0) {
+        cachedFloat32ArrayMemory0 = new Float32Array(wasm.memory.buffer);
+    }
+    return cachedFloat32ArrayMemory0;
+}
+
+function getArrayF32FromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return getFloat32ArrayMemory0().subarray(ptr / 4, ptr / 4 + len);
+}
+
+let cachedUint32ArrayMemory0 = null;
+
+function getUint32ArrayMemory0() {
+    if (cachedUint32ArrayMemory0 === null || cachedUint32ArrayMemory0.byteLength === 0) {
+        cachedUint32ArrayMemory0 = new Uint32Array(wasm.memory.buffer);
+    }
+    return cachedUint32ArrayMemory0;
+}
+
+function getArrayU32FromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return getUint32ArrayMemory0().subarray(ptr / 4, ptr / 4 + len);
+}
+
+function passArray32ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 4, 4) >>> 0;
+    getUint32ArrayMemory0().set(arg, ptr / 4);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
+}
+
+function passArrayF32ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 4, 4) >>> 0;
+    getFloat32ArrayMemory0().set(arg, ptr / 4);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
+}
+
+const InferenceOutputFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_inferenceoutput_free(ptr >>> 0, 1));
+
+class InferenceOutput {
+
+    static __wrap(ptr) {
+        ptr = ptr >>> 0;
+        const obj = Object.create(InferenceOutput.prototype);
+        obj.__wbg_ptr = ptr;
+        InferenceOutputFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        InferenceOutputFinalization.unregister(this);
+        return ptr;
+    }
+
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_inferenceoutput_free(ptr, 0);
+    }
+    /**
+     * @returns {Float32Array}
+     */
+    get data() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.inferenceoutput_data(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var v1 = getArrayF32FromWasm0(r0, r1).slice();
+            wasm.__wbindgen_export2(r0, r1 * 4, 4);
+            return v1;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * @returns {Uint32Array}
+     */
+    get shape() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.inferenceoutput_shape(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var v1 = getArrayU32FromWasm0(r0, r1).slice();
+            wasm.__wbindgen_export2(r0, r1 * 4, 4);
+            return v1;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+}
+if (Symbol.dispose) InferenceOutput.prototype[Symbol.dispose] = InferenceOutput.prototype.free;
+
+const RtenModelFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_rtenmodel_free(ptr >>> 0, 1));
+
+class RtenModel {
+
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        RtenModelFinalization.unregister(this);
+        return ptr;
+    }
+
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_rtenmodel_free(ptr, 0);
+    }
+    /**
+     * @returns {Uint32Array}
+     */
+    outputIds() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.rtenmodel_outputIds(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var v1 = getArrayU32FromWasm0(r0, r1).slice();
+            wasm.__wbindgen_export2(r0, r1 * 4, 4);
+            return v1;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * @param {number} input_id
+     * @param {Uint32Array} input_shape
+     * @param {Float32Array} input_data
+     * @param {number} output_id
+     * @returns {InferenceOutput}
+     */
+    runWithIds(input_id, input_shape, input_data, output_id) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passArray32ToWasm0(input_shape, wasm.__wbindgen_export);
+            const len0 = WASM_VECTOR_LEN;
+            const ptr1 = passArrayF32ToWasm0(input_data, wasm.__wbindgen_export);
+            const len1 = WASM_VECTOR_LEN;
+            wasm.rtenmodel_runWithIds(retptr, this.__wbg_ptr, input_id, ptr0, len0, ptr1, len1, output_id);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return InferenceOutput.__wrap(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * @param {Uint8Array} model_data
+     */
+    constructor(model_data) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passArray8ToWasm0(model_data, wasm.__wbindgen_export);
+            const len0 = WASM_VECTOR_LEN;
+            wasm.rtenmodel_new(retptr, ptr0, len0);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            this.__wbg_ptr = r0 >>> 0;
+            RtenModelFinalization.register(this, this.__wbg_ptr, this);
+            return this;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * @param {Uint32Array} input_shape
+     * @param {Float32Array} input_data
+     * @returns {InferenceOutput}
+     */
+    run(input_shape, input_data) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passArray32ToWasm0(input_shape, wasm.__wbindgen_export);
+            const len0 = WASM_VECTOR_LEN;
+            const ptr1 = passArrayF32ToWasm0(input_data, wasm.__wbindgen_export);
+            const len1 = WASM_VECTOR_LEN;
+            wasm.rtenmodel_run(retptr, this.__wbg_ptr, ptr0, len0, ptr1, len1);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            return InferenceOutput.__wrap(r0);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+    /**
+     * @param {string} name
+     * @returns {number | undefined}
+     */
+    findNode(name) {
+        const ptr0 = passStringToWasm0(name, wasm.__wbindgen_export, wasm.__wbindgen_export3);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.rtenmodel_findNode(this.__wbg_ptr, ptr0, len0);
+        return ret === 0x100000001 ? undefined : ret;
+    }
+    /**
+     * @returns {Uint32Array}
+     */
+    inputIds() {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            wasm.rtenmodel_inputIds(retptr, this.__wbg_ptr);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var v1 = getArrayU32FromWasm0(r0, r1).slice();
+            wasm.__wbindgen_export2(r0, r1 * 4, 4);
+            return v1;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+}
+if (Symbol.dispose) RtenModel.prototype[Symbol.dispose] = RtenModel.prototype.free;
+
+const RtenOcrPipelineFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_rtenocrpipeline_free(ptr >>> 0, 1));
+
+class RtenOcrPipeline {
+
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        RtenOcrPipelineFinalization.unregister(this);
+        return ptr;
+    }
+
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_rtenocrpipeline_free(ptr, 0);
+    }
+    /**
+     * Run full OCR pipeline directly in WebAssembly with calibrated image optimization
+     * @param {Uint8Array} image_rgba
+     * @param {number} width
+     * @param {number} height
+     * @param {number} det_thresh
+     * @param {number} box_thresh
+     * @param {number} unclip_ratio
+     * @param {boolean} apply_calibration
+     * @returns {string}
+     */
+    detectAndRecognize(image_rgba, width, height, det_thresh, box_thresh, unclip_ratio, apply_calibration) {
+        let deferred3_0;
+        let deferred3_1;
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passArray8ToWasm0(image_rgba, wasm.__wbindgen_export);
+            const len0 = WASM_VECTOR_LEN;
+            wasm.rtenocrpipeline_detectAndRecognize(retptr, this.__wbg_ptr, ptr0, len0, width, height, det_thresh, box_thresh, unclip_ratio, apply_calibration);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            var r3 = getDataViewMemory0().getInt32(retptr + 4 * 3, true);
+            var ptr2 = r0;
+            var len2 = r1;
+            if (r3) {
+                ptr2 = 0; len2 = 0;
+                throw takeObject(r2);
+            }
+            deferred3_0 = ptr2;
+            deferred3_1 = len2;
+            return getStringFromWasm0(ptr2, len2);
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+            wasm.__wbindgen_export2(deferred3_0, deferred3_1, 1);
+        }
+    }
+    /**
+     * @param {Uint8Array} det_data
+     * @param {Uint8Array} rec_data
+     * @param {string} dict_text
+     */
+    constructor(det_data, rec_data, dict_text) {
+        try {
+            const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
+            const ptr0 = passArray8ToWasm0(det_data, wasm.__wbindgen_export);
+            const len0 = WASM_VECTOR_LEN;
+            const ptr1 = passArray8ToWasm0(rec_data, wasm.__wbindgen_export);
+            const len1 = WASM_VECTOR_LEN;
+            const ptr2 = passStringToWasm0(dict_text, wasm.__wbindgen_export, wasm.__wbindgen_export3);
+            const len2 = WASM_VECTOR_LEN;
+            wasm.rtenocrpipeline_new(retptr, ptr0, len0, ptr1, len1, ptr2, len2);
+            var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
+            var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
+            var r2 = getDataViewMemory0().getInt32(retptr + 4 * 2, true);
+            if (r2) {
+                throw takeObject(r1);
+            }
+            this.__wbg_ptr = r0 >>> 0;
+            RtenOcrPipelineFinalization.register(this, this.__wbg_ptr, this);
+            return this;
+        } finally {
+            wasm.__wbindgen_add_to_stack_pointer(16);
+        }
+    }
+}
+if (Symbol.dispose) RtenOcrPipeline.prototype[Symbol.dispose] = RtenOcrPipeline.prototype.free;
+
+const EXPECTED_RESPONSE_TYPES = new Set(['basic', 'cors', 'default']);
+
+async function __wbg_load(module, imports) {
+    if (typeof Response === 'function' && module instanceof Response) {
+        if (typeof WebAssembly.instantiateStreaming === 'function') {
+            try {
+                return await WebAssembly.instantiateStreaming(module, imports);
+
+            } catch (e) {
+                const validResponse = module.ok && EXPECTED_RESPONSE_TYPES.has(module.type);
+
+                if (validResponse && module.headers.get('Content-Type') !== 'application/wasm') {
+                    console.warn("`WebAssembly.instantiateStreaming` failed because your server does not serve Wasm with `application/wasm` MIME type. Falling back to `WebAssembly.instantiate` which is slower. Original error:\n", e);
+
+                } else {
+                    throw e;
+                }
+            }
+        }
+
+        const bytes = await module.arrayBuffer();
+        return await WebAssembly.instantiate(bytes, imports);
+
+    } else {
+        const instance = await WebAssembly.instantiate(module, imports);
+
+        if (instance instanceof WebAssembly.Instance) {
+            return { instance, module };
+
+        } else {
+            return instance;
+        }
+    }
+}
+
+function __wbg_get_imports() {
+    const imports = {};
+    imports.wbg = {};
+    imports.wbg.__wbg___wbindgen_throw_b855445ff6a94295 = function(arg0, arg1) {
+        throw new Error(getStringFromWasm0(arg0, arg1));
+    };
+    imports.wbg.__wbindgen_cast_2241b6af4c4b2941 = function(arg0, arg1) {
+        // Cast intrinsic for `Ref(String) -> Externref`.
+        const ret = getStringFromWasm0(arg0, arg1);
+        return addHeapObject(ret);
+    };
+
+    return imports;
+}
+
+function __wbg_finalize_init(instance, module) {
+    wasm = instance.exports;
+    __wbg_init.__wbindgen_wasm_module = module;
+    cachedDataViewMemory0 = null;
+    cachedFloat32ArrayMemory0 = null;
+    cachedUint32ArrayMemory0 = null;
+    cachedUint8ArrayMemory0 = null;
+
+
+
+    return wasm;
+}
+
+function initSync(module) {
+    if (wasm !== undefined) return wasm;
+
+
+    if (typeof module !== 'undefined') {
+        if (Object.getPrototypeOf(module) === Object.prototype) {
+            ({module} = module)
+        } else {
+            console.warn('using deprecated parameters for `initSync()`; pass a single object instead')
+        }
+    }
+
+    const imports = __wbg_get_imports();
+
+    if (!(module instanceof WebAssembly.Module)) {
+        module = new WebAssembly.Module(module);
+    }
+
+    const instance = new WebAssembly.Instance(module, imports);
+
+    return __wbg_finalize_init(instance, module);
+}
+
+async function __wbg_init(module_or_path) {
+    if (wasm !== undefined) return wasm;
+
+
+    if (typeof module_or_path !== 'undefined') {
+        if (Object.getPrototypeOf(module_or_path) === Object.prototype) {
+            ({module_or_path} = module_or_path)
+        } else {
+            console.warn('using deprecated parameters for the initialization function; pass a single object instead')
+        }
+    }
+
+    if (typeof module_or_path === 'undefined') {
+        module_or_path = 'rten.wasm';
+    }
+    const imports = __wbg_get_imports();
+
+    if (typeof module_or_path === 'string' || (typeof Request === 'function' && module_or_path instanceof Request) || (typeof URL === 'function' && module_or_path instanceof URL)) {
+        module_or_path = fetch(module_or_path);
+    }
+
+    const { instance, module } = await __wbg_load(await module_or_path, imports);
+
+    return __wbg_finalize_init(instance, module);
+}
+
+
+
+
+return { initSync, RtenModel };
+})();
+</script>
+<script>
+// 기종별 칩셋·RAM (국내 출시 모델 기준)
+// RAM은 제조사 발표 또는 주요 매체 보도 기준. Apple은 RAM을 공식 발표하지 않아 업계 분석치를 사용.
+// r: 1 = 2026년 출시로 정식 사양이 아니라 보도·유출 기준인 항목
+const DEVICES = [
+  ["iPhone", "iPhone 11", "A13 Bionic", "4GB", 2019],
+  ["iPhone", "iPhone 11 Pro / Pro Max", "A13 Bionic", "4GB", 2019],
+  ["iPhone", "iPhone SE (2세대)", "A13 Bionic", "3GB", 2020],
+  ["iPhone", "iPhone 12 mini / 12", "A14 Bionic", "4GB", 2020],
+  ["iPhone", "iPhone 12 Pro / Pro Max", "A14 Bionic", "6GB", 2020],
+  ["iPhone", "iPhone 13 mini / 13", "A15 Bionic", "4GB", 2021],
+  ["iPhone", "iPhone 13 Pro / Pro Max", "A15 Bionic", "6GB", 2021],
+  ["iPhone", "iPhone SE (3세대)", "A15 Bionic", "4GB", 2022],
+  ["iPhone", "iPhone 14 / 14 Plus", "A15 Bionic", "6GB", 2022],
+  ["iPhone", "iPhone 14 Pro / Pro Max", "A16 Bionic", "6GB", 2022],
+  ["iPhone", "iPhone 15 / 15 Plus", "A16 Bionic", "6GB", 2023],
+  ["iPhone", "iPhone 15 Pro / Pro Max", "A17 Pro", "8GB", 2023],
+  ["iPhone", "iPhone 16 / 16 Plus", "A18", "8GB", 2024],
+  ["iPhone", "iPhone 16 Pro / Pro Max", "A18 Pro", "8GB", 2024],
+  ["iPhone", "iPhone 16e", "A18", "8GB", 2025],
+  ["iPhone", "iPhone 17", "A19", "8GB", 2025],
+  ["iPhone", "iPhone Air", "A19 Pro", "12GB", 2025],
+  ["iPhone", "iPhone 17 Pro / Pro Max", "A19 Pro", "12GB", 2025],
+  ["iPhone", "iPhone 18 Pro / Pro Max", "A20 Pro", "12GB", 2026, 1],
+  ["iPhone", "iPhone Duo (폴더블)", "A20 Pro", "12GB", 2026, 1],
+  ["iPad", "iPad (9세대)", "A13 Bionic", "3GB", 2021],
+  ["iPad", "iPad (10세대)", "A14 Bionic", "4GB", 2022],
+  ["iPad", "iPad (A16)", "A16", "6GB", 2025],
+  ["iPad", "iPad mini (6세대)", "A15 Bionic", "4GB", 2021],
+  ["iPad", "iPad mini (A17 Pro)", "A17 Pro", "8GB", 2024],
+  ["iPad", "iPad Air (5세대, M1)", "M1", "8GB", 2022],
+  ["iPad", "iPad Air 11/13 (M2)", "M2", "8GB", 2024],
+  ["iPad", "iPad Air 11/13 (M3)", "M3", "8GB", 2025],
+  ["iPad", "iPad Pro 11/12.9 (M2)", "M2", "8GB (1TB 이상 16GB)", 2022],
+  ["iPad", "iPad Pro 11/13 (M4)", "M4", "8GB (1TB 이상 16GB)", 2024],
+  ["iPad", "iPad Pro 11/13 (M5)", "M5", "12GB (1TB 이상 16GB)", 2025],
+  ["Galaxy S", "Galaxy S21 / S21+", "Exynos 2100", "8GB", 2021],
+  ["Galaxy S", "Galaxy S21 Ultra", "Exynos 2100", "12GB / 16GB", 2021],
+  ["Galaxy S", "Galaxy S22 / S22+", "Snapdragon 8 Gen 1", "8GB", 2022],
+  ["Galaxy S", "Galaxy S22 Ultra", "Snapdragon 8 Gen 1", "12GB", 2022],
+  ["Galaxy S", "Galaxy S23 / S23+", "Snapdragon 8 Gen 2 for Galaxy", "8GB", 2023],
+  ["Galaxy S", "Galaxy S23 Ultra", "Snapdragon 8 Gen 2 for Galaxy", "12GB", 2023],
+  ["Galaxy S", "Galaxy S24 / S24+", "Exynos 2400", "8GB / 12GB", 2024],
+  ["Galaxy S", "Galaxy S24 Ultra", "Snapdragon 8 Gen 3 for Galaxy", "12GB", 2024],
+  ["Galaxy S", "Galaxy S24 FE", "Exynos 2400e", "8GB", 2024],
+  ["Galaxy S", "Galaxy S25 / S25+", "Snapdragon 8 Elite for Galaxy", "12GB", 2025],
+  ["Galaxy S", "Galaxy S25 Ultra", "Snapdragon 8 Elite for Galaxy", "12GB (1TB 16GB)", 2025],
+  ["Galaxy S", "Galaxy S25 Edge", "Snapdragon 8 Elite for Galaxy", "12GB", 2025],
+  ["Galaxy S", "Galaxy S25 FE", "Exynos 2400", "8GB", 2025],
+  ["Galaxy S", "Galaxy S26 / S26+", "Exynos 2600 (국내판)", "12GB", 2026, 1],
+  ["Galaxy S", "Galaxy S26 Ultra", "Snapdragon 8 Elite Gen 5 for Galaxy", "12GB / 16GB", 2026, 1],
+  ["Galaxy Z 폴더블", "Galaxy Z Fold3", "Snapdragon 888", "12GB", 2021],
+  ["Galaxy Z 폴더블", "Galaxy Z Fold4", "Snapdragon 8+ Gen 1", "12GB", 2022],
+  ["Galaxy Z 폴더블", "Galaxy Z Fold5", "Snapdragon 8 Gen 2 for Galaxy", "12GB", 2023],
+  ["Galaxy Z 폴더블", "Galaxy Z Fold6", "Snapdragon 8 Gen 3 for Galaxy", "12GB", 2024],
+  ["Galaxy Z 폴더블", "Galaxy Z Fold7", "Snapdragon 8 Elite for Galaxy", "12GB (1TB 16GB)", 2025],
+  ["Galaxy Z 폴더블", "Galaxy Z Fold8", "Snapdragon 8 Elite Gen 5 for Galaxy", "12GB", 2026, 1],
+  ["Galaxy Z 폴더블", "Galaxy Z Fold8 Ultra", "Snapdragon 8 Elite Gen 5 for Galaxy", "최대 16GB", 2026, 1],
+  ["Galaxy Z 폴더블", "Galaxy Z Flip3", "Snapdragon 888", "8GB", 2021],
+  ["Galaxy Z 폴더블", "Galaxy Z Flip4", "Snapdragon 8+ Gen 1", "8GB", 2022],
+  ["Galaxy Z 폴더블", "Galaxy Z Flip5", "Snapdragon 8 Gen 2 for Galaxy", "8GB", 2023],
+  ["Galaxy Z 폴더블", "Galaxy Z Flip6", "Snapdragon 8 Gen 3 for Galaxy", "12GB", 2024],
+  ["Galaxy Z 폴더블", "Galaxy Z Flip7", "Exynos 2500", "12GB", 2025],
+  ["Galaxy Z 폴더블", "Galaxy Z Flip7 FE", "Exynos 2400", "8GB", 2025],
+  ["Galaxy Z 폴더블", "Galaxy Z Flip8", "Exynos 2600", "12GB", 2026, 1],
+  ["Galaxy A", "Galaxy A55", "Exynos 1480", "8GB", 2024],
+  ["Galaxy A", "Galaxy A56", "Exynos 1580", "8GB", 2025],
+  ["Galaxy Tab", "Galaxy Tab S7 / S7+", "Snapdragon 865+", "6GB / 8GB", 2020],
+  ["Galaxy Tab", "Galaxy Tab S8 / S8+", "Snapdragon 8 Gen 1", "8GB", 2022],
+  ["Galaxy Tab", "Galaxy Tab S8 Ultra", "Snapdragon 8 Gen 1", "12GB / 16GB", 2022],
+  ["Galaxy Tab", "Galaxy Tab S9 / S9+", "Snapdragon 8 Gen 2 for Galaxy", "8GB / 12GB", 2023],
+  ["Galaxy Tab", "Galaxy Tab S9 Ultra", "Snapdragon 8 Gen 2 for Galaxy", "12GB / 16GB", 2023],
+  ["Galaxy Tab", "Galaxy Tab S9 FE / FE+", "Exynos 1380", "6GB / 8GB", 2023],
+  ["Galaxy Tab", "Galaxy Tab S10+ / S10 Ultra", "Dimensity 9300+", "12GB (1TB 16GB)", 2024],
+  ["Galaxy Tab", "Galaxy Tab S10 FE / FE+", "Exynos 1580", "8GB / 12GB", 2025],
+  ["Galaxy Tab", "Galaxy Tab S11 / S11 Ultra", "Dimensity 9400+", "12GB (1TB 16GB)", 2025],
+  ["Galaxy Tab", "Galaxy Tab A9+", "Snapdragon 695", "4GB / 8GB", 2023],
+  ["기타", "기타 iPhone", "-", "-", 0],
+  ["기타", "기타 Android 폰", "-", "-", 0],
+  ["기타", "기타 Android 태블릿", "-", "-", 0],
+].map(([group, name, chip, ram, year, reported]) => ({ group, name, chip, ram, year, reported: !!reported }));
+
+// ===== 책장 인식 파이프라인 (기기 내 실행) =====
+// 서버 파이썬 구현(src/segment.py, ocr.py, matcher.py, pipeline.py)을 그대로 옮긴 것.
+// 환경 독립: 캔버스 생성 함수 mk(w, h)를 주입받아 브라우저와 노드에서 같은 코드로 동작.
+const SP = (() => {
+  const ACCEPT = 72, EARLY = 80, MARGIN = 8;
+
+  // ---------- 영상 처리 ----------
+  function toGray(cv) {
+    const g = cv.getContext("2d"), { width: w, height: h } = cv, d = g.getImageData(0, 0, w, h).data;
+    const out = new Uint8Array(w * h);
+    for (let i = 0; i < w * h; i++) out[i] = Math.round(0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]);
+    return { w, h, d: out };
+  }
+  function grayToCanvas(G, mk) {
+    const cv = mk(G.w, G.h), g = cv.getContext("2d"), im = g.createImageData(G.w, G.h);
+    for (let i = 0; i < G.w * G.h; i++) { const v = G.d[i]; im.data[i * 4] = im.data[i * 4 + 1] = im.data[i * 4 + 2] = v; im.data[i * 4 + 3] = 255; }
+    g.putImageData(im, 0, 0); return cv;
+  }
+  // cv2.INTER_LINEAR 과 같은 반화소 중심 쌍선형 보간
+  function resizeGray(G, W, H) {
+    const out = new Uint8Array(W * H), sx = G.w / W, sy = G.h / H;
+    for (let y = 0; y < H; y++) {
+      let fy = (y + 0.5) * sy - 0.5; if (fy < 0) fy = 0; let y0 = Math.floor(fy); if (y0 > G.h - 1) y0 = G.h - 1; const y1 = Math.min(y0 + 1, G.h - 1), ay = fy - y0;
+      for (let x = 0; x < W; x++) {
+        let fx = (x + 0.5) * sx - 0.5; if (fx < 0) fx = 0; let x0 = Math.floor(fx); if (x0 > G.w - 1) x0 = G.w - 1; const x1 = Math.min(x0 + 1, G.w - 1), ax = fx - x0;
+        const a = G.d[y0 * G.w + x0], b = G.d[y0 * G.w + x1], c = G.d[y1 * G.w + x0], e = G.d[y1 * G.w + x1];
+        out[y * W + x] = Math.round((a * (1 - ax) + b * ax) * (1 - ay) + (c * (1 - ax) + e * ax) * ay);
+      }
+    }
+    return { w: W, h: H, d: out };
+  }
+  const median = (a) => { const s = [...a].sort((x, y) => x - y), n = s.length; return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2; };
+
+  // 회전 박스(cx, cy, w, h, ang[rad]) → '세로로 길고 위가 위'인 정면 크롭 (segment.crop_upright 대응)
+  function cropUpright(src, b, mk, pad = 2) {
+    let { cx, cy, w, h, ang } = b;
+    while (ang > Math.PI / 2) ang -= Math.PI;
+    while (ang <= -Math.PI / 2) ang += Math.PI;
+    if (Math.abs(ang) > Math.PI / 4) { [w, h] = [h, w]; ang -= ang > 0 ? Math.PI / 2 : -Math.PI / 2; }
+    if (w > h) [w, h] = [h, w];
+    const W = Math.max(1, Math.round(w - 2 * pad)), H = Math.max(1, Math.round(h - 2 * pad));
+    const cv = mk(W, H), g = cv.getContext("2d");
+    g.imageSmoothingEnabled = true; if ("imageSmoothingQuality" in g) g.imageSmoothingQuality = "high";
+    g.translate(W / 2, H / 2); g.rotate(-ang); g.drawImage(src, -cx, -cy);
+    return cv;
+  }
+  function rotate90(cv, cw, mk) {
+    const out = mk(cv.height, cv.width), g = out.getContext("2d");
+    g.translate(out.width / 2, out.height / 2); g.rotate(cw ? Math.PI / 2 : -Math.PI / 2); g.drawImage(cv, -cv.width / 2, -cv.height / 2);
+    return out;
+  }
+
+  // CLAHE (clipLimit 2.0, 4x4 타일) — 실사진에서 제목 확정 9→11권, 오확정 0 유지 (exp_ocr_boost.py)
+  function clahe(G, clip = 2.0, tiles = 4) {
+    const { w, h, d } = G, tw = Math.ceil(w / tiles), th = Math.ceil(h / tiles), luts = [];
+    for (let ty = 0; ty < tiles; ty++) for (let tx = 0; tx < tiles; tx++) {
+      const x0 = tx * tw, y0 = ty * th, x1 = Math.min(w, x0 + tw), y1 = Math.min(h, y0 + th);
+      const hist = new Float64Array(256); let n = 0;
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { hist[d[y * w + x]]++; n++; }
+      const lut = new Uint8Array(256);
+      if (n) {
+        const lim = Math.max(1, (clip * n) / 256); let ex = 0;
+        for (let i = 0; i < 256; i++) if (hist[i] > lim) { ex += hist[i] - lim; hist[i] = lim; }
+        const add = ex / 256; let cum = 0;
+        for (let i = 0; i < 256; i++) { cum += hist[i] + add; lut[i] = Math.min(255, Math.round((cum * 255) / n)); }
+      } else for (let i = 0; i < 256; i++) lut[i] = i;
+      luts.push(lut);
+    }
+    const out = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) {
+      let gy = (y + 0.5) / th - 0.5, ty0 = Math.floor(gy), fy = gy - ty0; let ty1 = ty0 + 1;
+      if (ty0 < 0) { ty0 = 0; fy = 0; } if (ty1 > tiles - 1) ty1 = tiles - 1; if (ty0 > tiles - 1) ty0 = tiles - 1;
+      for (let x = 0; x < w; x++) {
+        let gx = (x + 0.5) / tw - 0.5, tx0 = Math.floor(gx), fx = gx - tx0; let tx1 = tx0 + 1;
+        if (tx0 < 0) { tx0 = 0; fx = 0; } if (tx1 > tiles - 1) tx1 = tiles - 1; if (tx0 > tiles - 1) tx0 = tiles - 1;
+        const v = d[y * w + x];
+        const a = luts[ty0 * tiles + tx0][v], b = luts[ty0 * tiles + tx1][v], c = luts[ty1 * tiles + tx0][v], e = luts[ty1 * tiles + tx1][v];
+        out[y * w + x] = Math.round((a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + e * fx) * fy);
+      }
+    }
+    return { w, h, d: out };
+  }
+
+  // 3x3 가우시안 + 오츠 이진화, 테두리 다수 색을 배경으로 보고 글자를 1로
+  function binarize(G) {
+    const { w, h, d } = G, bl = new Uint8Array(w * h), k = [1, 2, 1];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let s = 0;
+      for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+        let yy = y + j, xx = x + i;
+        if (yy < 0) yy = -yy; if (yy >= h) yy = 2 * h - yy - 2; if (xx < 0) xx = -xx; if (xx >= w) xx = 2 * w - xx - 2;
+        yy = Math.min(Math.max(yy, 0), h - 1); xx = Math.min(Math.max(xx, 0), w - 1);
+        s += d[yy * w + xx] * k[i + 1] * k[j + 1];
+      }
+      bl[y * w + x] = Math.round(s / 16);
+    }
+    const hist = new Array(256).fill(0); for (const v of bl) hist[v]++;
+    let sum = 0; for (let i = 0; i < 256; i++) sum += i * hist[i];
+    let sB = 0, wB = 0, best = 0, thr = 0; const N = w * h;
+    for (let t = 0; t < 256; t++) { wB += hist[t]; if (!wB) continue; const wF = N - wB; if (!wF) break; sB += t * hist[t]; const mB = sB / wB, mF = (sum - sB) / wF, v = wB * wF * (mB - mF) * (mB - mF); if (v > best) { best = v; thr = t; } }
+    const b = new Uint8Array(w * h); for (let i = 0; i < N; i++) b[i] = bl[i] > thr ? 1 : 0;
+    let bs = 0, bn = 0;
+    for (let x = 0; x < w; x++) { bs += b[x] + b[(h - 1) * w + x]; bn += 2; }
+    for (let y = 0; y < h; y++) { bs += b[y * w] + b[y * w + w - 1]; bn += 2; }
+    if (bs / bn > 0.5) for (let i = 0; i < N; i++) b[i] = 1 - b[i];
+    return b;
+  }
+
+  // 세로쓰기 재배열 (ocr.relayout_vertical 대응)
+  function relayoutVertical(cv, mk, textFrac = 0.88) {
+    const G = toGray(cv), { w, h } = G;
+    if (h < 8 || w < 4) return null;
+    const b = binarize(G), m = Math.max(1, Math.floor(w / 12)), H88 = Math.floor(h * textFrac);
+    const on = [];
+    for (let y = 0; y < H88; y++) { let c = 0; for (let x = m; x < w - m; x++) c += b[y * w + x]; on.push(c > Math.max(1, 0.03 * w)); }
+    let segs = [], st = null;
+    on.forEach((v, y) => { if (v && st === null) st = y; else if (!v && st !== null) { segs.push([st, y]); st = null; } });
+    if (st !== null) segs.push([st, on.length]);
+    let merged = [];
+    for (const [a, c] of segs) {
+      const L = merged[merged.length - 1];
+      if (L && a - L[1] < Math.max(2, w * 0.06) && c - L[0] < w * 0.95) L[1] = c; else merged.push([a, c]);
+    }
+    merged = merged.filter(([a, c]) => c - a > w * 0.12);
+    const sq = merged.map(([a, c]) => c - a).filter((v) => v > 0.45 * w && v < 1.15 * w);
+    const pitch = sq.length ? median(sq) : 0.7 * w;
+    const split = [];
+    for (const [a, c] of merged) {
+      const n = Math.round((c - a) / pitch);
+      if (n >= 2 && c - a > 1.5 * pitch) { const step = (c - a) / n; for (let k = 0; k < n; k++) split.push([Math.floor(a + k * step), Math.floor(a + (k + 1) * step)]); }
+      else split.push([a, c]);
+    }
+    if (!split.length) return null;
+    const hs = split.map(([a, c]) => c - a), tgt = Math.floor(median(hs)) + 8, bg = Math.floor(median(G.d));
+    const tiles = [];
+    for (const [a, c] of split) {
+      const y0 = Math.max(0, a - 3), y1 = Math.min(h, c + 3), T = { w, h: y1 - y0, d: G.d.slice(y0 * w, y1 * w) };
+      const tw = Math.max(1, Math.floor(w * (tgt / T.h)));
+      tiles.push(resizeGray(T, tw, tgt));
+      const gw = Math.max(4, Math.floor(tgt / 6)); tiles.push({ w: gw, h: tgt, d: new Uint8Array(gw * tgt).fill(bg) });
+    }
+    const W = tiles.reduce((s, t) => s + t.w, 0), out = new Uint8Array(W * tgt);
+    let ox = 0; for (const t of tiles) { for (let y = 0; y < tgt; y++) out.set(t.d.subarray(y * t.w, (y + 1) * t.w), y * W + ox); ox += t.w; }
+    return grayToCanvas({ w: W, h: tgt, d: out }, mk);
+  }
+
+  // 인식기 입력: EasyOCR get_image_list + AlignCollate + NormalizePAD 대응
+  function recInput(cv) {
+    let G = toGray(cv), ratio = G.w / G.h;
+    if (ratio < 1) { ratio = 1 / ratio; G = resizeGray(G, 64, Math.floor(64 * ratio)); }
+    else G = resizeGray(G, Math.max(1, Math.floor(64 * ratio)), 64);
+    const maxW = Math.ceil(ratio) * 64;
+    let rw = Math.ceil(64 * (G.w / G.h)); if (rw > maxW) rw = maxW;
+    if (rw !== G.w || G.h !== 64) G = resizeGray(G, rw, 64);
+    const W = maxW, f = new Float32Array(64 * W);
+    for (let y = 0; y < 64; y++) for (let x = 0; x < W; x++) { const sx = Math.min(x, G.w - 1); f[y * W + x] = (G.d[y * G.w + sx] / 255 - 0.5) / 0.5; }
+    return { data: f, width: W };
+  }
+  function decode(logits, T, C, charset, ignore) {
+    let out = "", prev = -1;
+    for (let t = 0; t < T; t++) {
+      let bi = 0, bv = -Infinity;
+      for (let c = 0; c < C; c++) { if (ignore.has(c)) continue; const v = logits[t * C + c]; if (v > bv) { bv = v; bi = c; } }
+      if (bi !== prev && bi !== 0) out += charset[bi] || "";
+      prev = bi;
+    }
+    return out;
+  }
+  function views(crop, mk) {
+    const v = [["rot_cw", rotate90(crop, true, mk)], ["rot_ccw", rotate90(crop, false, mk)]];
+    const rl = relayoutVertical(crop, mk); if (rl) v.push(["relayout", rl]);
+    return v;
+  }
+
+  // ---------- 서지 매칭 (matcher.py 대응) ----------
+  const CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ", JUNG = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ", JONG = ["", ..."ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ"];
+  const normalize = (s) => s.toLowerCase().replace(/[^0-9a-z가-힣]/g, "");
+  function toJamo(s) { let o = ""; for (const ch of s) { let c = ch.charCodeAt(0); if (c >= 0xac00 && c <= 0xd7a3) { c -= 0xac00; o += CHO[Math.floor(c / 588)] + JUNG[Math.floor((c % 588) / 28)] + JONG[c % 28]; } else o += ch; } return o; }
+  function lcs(a, b) { const m = a.length, n = b.length; if (!m || !n) return 0; let prev = new Uint16Array(n + 1), cur = new Uint16Array(n + 1); for (let i = 1; i <= m; i++) { for (let j = 1; j <= n; j++) cur[j] = a[i - 1] === b[j - 1] ? prev[j - 1] + 1 : Math.max(prev[j], cur[j - 1]); [prev, cur] = [cur, prev]; } return prev[n]; }
+  const ratio = (a, b) => (a.length + b.length ? (200 * lcs(a, b)) / (a.length + b.length) : 100);
+  function partial(s, t) { // s가 짧은 쪽: t의 모든 길이-|s| 구간(양끝 부분 구간 포함)과 비교
+    if (s.length > t.length) [s, t] = [t, s];
+    const L = s.length; let best = 0;
+    for (let i = 1 - L; i < t.length; i++) { const sub = t.slice(Math.max(0, i), Math.min(t.length, i + L)); const r = ratio(s, sub); if (r > best) { best = r; if (best === 100) break; } }
+    return best;
+  }
+  function isGarbage(text) {
+    const q = normalize(text); if (q.length < 2) return true;
+    const uniq = new Set(q).size / q.length; let longest = 1, run = 1;
+    for (let i = 1; i < q.length; i++) { run = q[i] === q[i - 1] ? run + 1 : 1; if (run > longest) longest = run; }
+    let hangul = 0, alpha = 0; for (const c of q) { if (c >= "가" && c <= "힣") hangul++; else if (/[a-z]/.test(c)) alpha++; }
+    return (longest >= 4 || uniq < 0.35) && (hangul + alpha) / q.length > 0 && uniq < 0.5;
+  }
+  const bigrams = (s) => { const g = new Set(); for (let i = 0; i < s.length - 1; i++) g.add(s.slice(i, i + 2)); if (!g.size && s) g.add(s); return g; };
+  class Matcher {
+    constructor(titles) {
+      this.titles = titles; this.norm = titles.map(normalize); this.jamo = this.norm.map(toJamo); this.idx = new Map();
+      const add = (k, i) => { if (!this.idx.has(k)) this.idx.set(k, new Set()); this.idx.get(k).add(i); };
+      this.norm.forEach((n, i) => { for (const g of bigrams(n)) add(g, i); for (const c of new Set(n)) add("#" + c, i); });
+    }
+    candidates(q, k = 50) {
+      const v = new Map(), bump = (i, s) => v.set(i, (v.get(i) || 0) + s);
+      for (const g of bigrams(q)) for (const i of this.idx.get(g) || []) bump(i, 2);
+      for (const c of new Set(q)) for (const i of this.idx.get("#" + c) || []) bump(i, 1);
+      return [...v.entries()].sort((a, b) => b[1] - a[1]).slice(0, k).map((e) => e[0]);
+    }
+    score(qj, i) {
+      const tj = this.jamo[i], full = ratio(qj, tj), part = qj.length >= tj.length ? partial(tj, qj) : full;
+      let s = Math.max(full, 0.92 * part);
+      if (this.norm[i].length <= 2 && qj.length > 3 * tj.length) s *= 0.85;
+      return s;
+    }
+    volume(i) { const n = this.norm[i], m = n.match(/(상|중|하|[1-9])$/); return m && n.length > 2 ? [n.slice(0, -1), m[1]] : [n, null]; }
+    verify(q, sc) {
+      if (!sc.length) return [false, "후보 없음"];
+      const [s1, i1] = sc[0], [base, vol] = this.volume(i1);
+      const sib = this.norm.map((_, j) => j).filter((j) => j !== i1 && this.volume(j)[0] === base && this.volume(j)[1] !== vol);
+      if (sib.length) { if (!vol || !q.includes(vol)) return [false, "권차 불명확"]; if (sib.some((j) => this.volume(j)[1] && q.includes(this.volume(j)[1]))) return [false, "권차 혼재"]; }
+      // 1위가 2위 제목을 통째로 포함하는 더 긴 제목이면(예: 'Ulaby의 전자기학' ⊃ '전자기학') 점수 차 규칙을 적용하지 않음
+      if (sc.length > 1) { const [s2, i2] = sc[1]; if (this.norm[i2] !== this.norm[i1] && !this.norm[i1].includes(this.norm[i2]) && s1 - s2 < MARGIN) return [false, "1·2위 점수 차 작음"]; }
+      for (const [s2, i2] of sc.slice(1)) if (i2 !== i1 && this.norm[i2].includes(this.norm[i1]) && s2 >= 70) return [false, "포함 관계 제목"];
+      if (this.norm[i1].length <= 4 && s1 < 80) return [false, "짧은 제목 점수 부족"];
+      return [true, ""];
+    }
+    match(text, topk = 3, verify = true) {
+      const q = normalize(text); if (!q) return [];
+      const qj = toJamo(q), sc = this.candidates(q).map((i) => [this.score(qj, i), i]).sort((a, b) => b[0] - a[0]).slice(0, topk);
+      const [ok, why] = verify ? this.verify(q, sc) : [true, ""];
+      return sc.map(([s, i], k) => ({ title: this.titles[i], score: Math.round(s * 10) / 10, verified: k === 0 ? ok : null, reason: k === 0 ? why : null }));
+    }
+  }
+
+  // 책등 1개 판독: 재배열 → 반시계 → 시계 순, 점수 80 이상이면 조기 종료 (pipeline.read_spine 대응)
+  // opts: A(초기) = {clahe:false, early:false, verify:false, noText:false}, B(개선) = 모두 true
+  async function readSpine(crop, mk, runRec, matcher, opts = { clahe: true, early: true, verify: true, noText: true }) {
+    const order = opts.early ? ["relayout", "rot_ccw", "rot_cw"] : ["rot_cw", "rot_ccw", "relayout"];
+    const src = opts.clahe ? grayToCanvas(clahe(toGray(crop)), mk) : crop;
+    const vs = views(src, mk).sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]));
+    let best = null, calls = 0;
+    for (const [name, im] of vs) {
+      if (opts.early && best && best.score >= EARLY) break;
+      calls++;
+      const text = await runRec(opts.prep ? opts.prep(im) : recInput(im));
+      const m = matcher.match(text, 3, opts.verify); let s = m.length ? m[0].score : 0;
+      if (m.length && !m[0].verified) s = Math.min(s, ACCEPT - 0.1);
+      if (!best || s > best.score) best = { view: name, raw: text, score: s, top: m };
+    }
+    const top = best.top[0];
+    const title = top && best.score >= ACCEPT ? top.title : null;
+    return { title, reason: best.top[0] ? best.top[0].reason : "", top1: best.top[0] ? best.top[0].title : "", score: best.score, raw: best.raw, view: best.view, calls, noText: opts.noText && !title && isGarbage(best.raw), candidates: best.top.map((t) => t.title) };
+  }
+
+  return { clahe, toGray, cropUpright, readSpine, Matcher, recInput, decode, relayoutVertical, isGarbage, normalize, toJamo, ratio, partial, ACCEPT };
+})();
+if (typeof module !== "undefined") module.exports = SP;
+
+</script>
+<script>
+// 최종모델(E): PC 노트북(shelfkit.py)의 Step 1 책 검출 규칙 + E 제목 규칙을 그대로 옮긴 코드
+// 신경망은 런타임(rt)으로 주입: spine(img) / cover(img, size, rot180) / textDet(canvas) / recKo(canvases) / recEn(canvases)
+// 모든 임계값은 shelfkit.py와 같다. (경량 설정은 CFG에서만 바꾼다)
+const EP = (() => {
+  const ACCEPT = 72;
+  const CFG = {
+    spine: { conf: 0.45, iou: 0.5, minAspect: 2.5, imgsz: 960 },   // 노트북 튜닝 셀이 고른 값
+    coverSizes: [960], coverRot180: false,                            // PC: [960, 1280, 1600] × (원본, 180°)
+    coverConf: 0.02, minSupport: 0.12, spineSceneSupport: 0.35, maxAspect: 2.4, minArea: 0.003,
+    maxRead: 6, orientBoxes: 2, maxBoxes: 4, ratio: 2.0, minConf: 0.5, // PC: orientBoxes = maxRead(6)
+  };
+
+  // ---------------------------------------------------------------- 기하
+  const bboxOf = (p) => { let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity; for (const [x, y] of p) { if (x < x1) x1 = x; if (y < y1) y1 = y; if (x > x2) x2 = x; if (y > y2) y2 = y; } return [x1, y1, x2, y2]; };
+  const inter = (a, b) => Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])) * Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+  const area = (a) => (a[2] - a[0]) * (a[3] - a[1]);
+  const iou = (a, b) => { const i = inter(a, b); return i / Math.max(1e-6, area(a) + area(b) - i); };
+  const wh = (c) => [c.bbox[2] - c.bbox[0], c.bbox[3] - c.bbox[1]];
+  const median = (a) => { const s = [...a].sort((x, y) => x - y), n = s.length; return n ? (n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2) : 0; };
+  const polyArea = (p) => { let s = 0; for (let i = 0; i < p.length; i++) { const [x1, y1] = p[i], [x2, y2] = p[(i + 1) % p.length]; s += x1 * y2 - x2 * y1; } return Math.abs(s) / 2; };
+  function convexHull(pts) {
+    const P = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1]); if (P.length < 3) return P;
+    const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const lo = [], up = [];
+    for (const p of P) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+    for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
+    return lo.slice(0, -1).concat(up.slice(0, -1));
+  }
+  // 최소 외접 회전 사각형 (회전 캘리퍼스). 반환: {cx, cy, w, h, ang(rad), pts}
+  function minAreaRect(pts) {
+    const H = convexHull(pts);
+    if (H.length === 1) return { cx: H[0][0], cy: H[0][1], w: 0, h: 0, ang: 0, pts: [H[0], H[0], H[0], H[0]] };
+    let best = null;
+    for (let i = 0; i < H.length; i++) {
+      const [x1, y1] = H[i], [x2, y2] = H[(i + 1) % H.length], L = Math.hypot(x2 - x1, y2 - y1); if (!L) continue;
+      const ux = (x2 - x1) / L, uy = (y2 - y1) / L;
+      let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
+      for (const [x, y] of H) { const a = x * ux + y * uy, b = -x * uy + y * ux; if (a < a0) a0 = a; if (a > a1) a1 = a; if (b < b0) b0 = b; if (b > b1) b1 = b; }
+      const ar = (a1 - a0) * (b1 - b0);
+      if (!best || ar < best.ar) best = { ar, ux, uy, a0, a1, b0, b1 };
+    }
+    if (!best) { const b = bboxOf(H); return { cx: (b[0] + b[2]) / 2, cy: (b[1] + b[3]) / 2, w: b[2] - b[0], h: b[3] - b[1], ang: 0, pts: [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]] }; }
+    const { ux, uy, a0, a1, b0, b1 } = best, P = (a, b) => [a * ux - b * uy, a * uy + b * ux];
+    const pts4 = [P(a0, b0), P(a1, b0), P(a1, b1), P(a0, b1)], ca = (a0 + a1) / 2, cb = (b0 + b1) / 2, c = P(ca, cb);
+    return { cx: c[0], cy: c[1], w: a1 - a0, h: b1 - b0, ang: Math.atan2(uy, ux), pts: pts4 };
+  }
+  const rectShort = (p) => { const r = minAreaRect(p); return Math.min(r.w, r.h); };
+  function clipConvex(subject, clip) { // Sutherland–Hodgman (두 볼록 다각형 교집합)
+    const ccw = (p) => { let s = 0; for (let i = 0; i < p.length; i++) { const [x1, y1] = p[i], [x2, y2] = p[(i + 1) % p.length]; s += x1 * y2 - x2 * y1; } return s > 0 ? p : [...p].reverse(); };
+    let out = ccw(subject); const C = ccw(clip);
+    for (let i = 0; i < C.length && out.length; i++) {
+      const A = C[i], B = C[(i + 1) % C.length], inp = out; out = [];
+      const side = (p) => (B[0] - A[0]) * (p[1] - A[1]) - (B[1] - A[1]) * (p[0] - A[0]);
+      for (let j = 0; j < inp.length; j++) {
+        const P = inp[j], Q = inp[(j + 1) % inp.length], sp = side(P), sq = side(Q);
+        if (sp >= 0) out.push(P);
+        if ((sp >= 0) !== (sq >= 0)) { const t = sp / (sp - sq); out.push([P[0] + t * (Q[0] - P[0]), P[1] + t * (Q[1] - P[1])]); }
+      }
+    }
+    return out;
+  }
+  const polyInter = (a, b) => { const c = clipConvex(a, b); return c.length >= 3 ? polyArea(c) : 0; };
+  const boxPoly = (b) => { const c = Math.cos(b.ang), s = Math.sin(b.ang), hw = b.w / 2, hh = b.h / 2; return [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(([x, y]) => [b.cx + x * c - y * s, b.cy + x * s + y * c]); };
+
+  // ---------------------------------------------------------------- 캔버스 도우미
+  let mk = null, lastYield = 0;
+  // 계산 중에도 화면(진행 막대)이 갱신되도록 약 60ms마다 한 번 이벤트 루프에 양보
+  async function breathe() { const t = Date.now(); if (t - lastYield > 60) { lastYield = t; await new Promise((r) => setTimeout(r, 0)); } }
+  function cropRect(src, x1, y1, x2, y2) {
+    const W = Math.max(1, x2 - x1), H = Math.max(1, y2 - y1), c = mk(W, H); c.getContext("2d").drawImage(src, x1, y1, W, H, 0, 0, W, H); return c;
+  }
+  function rot(src, k) { // k: 1 = 시계 90°, 2 = 180°, 3 = 반시계 90°
+    const sw = src.width, sh = src.height, c = k % 2 ? mk(sh, sw) : mk(sw, sh), g = c.getContext("2d");
+    g.translate(c.width / 2, c.height / 2); g.rotate(k * Math.PI / 2); g.drawImage(src, -sw / 2, -sh / 2); return c;
+  }
+  // 회전 박스를 '세로로 긴 + 위쪽이 위'로 세워 자르기 (crop_upright). 크롭 좌표 → 원본 좌표 변환도 반환
+  function cropUpright(src, b, pad = 2) {
+    let { cx, cy, w, h, ang } = b;
+    while (ang > Math.PI / 2) ang -= Math.PI;
+    while (ang <= -Math.PI / 2) ang += Math.PI;
+    if (Math.abs(ang) > Math.PI / 4) { [w, h] = [h, w]; ang -= ang > 0 ? Math.PI / 2 : -Math.PI / 2; }
+    if (w > h) [w, h] = [h, w];
+    const W = Math.max(1, Math.round(w - 2 * pad)), H = Math.max(1, Math.round(h - 2 * pad));
+    const cv = mk(W, H), g = cv.getContext("2d");
+    g.imageSmoothingEnabled = true; if ("imageSmoothingQuality" in g) g.imageSmoothingQuality = "high";
+    g.translate(W / 2, H / 2); g.rotate(-ang); g.drawImage(src, -cx, -cy);
+    const c = Math.cos(ang), s = Math.sin(ang);
+    const tf = ([u, v]) => { const x = u - W / 2, y = v - H / 2; return [cx + x * c - y * s, cy + x * s + y * c]; };
+    return { crop: cv, tf };
+  }
+  function cropBook(img, bk) {
+    if (bk.kind === "spine") return cropUpright(img, bk);
+    let [x1, y1, x2, y2] = bk.bbox.map(Math.round); x1 = Math.max(0, x1); y1 = Math.max(0, y1); x2 = Math.min(img.width, x2); y2 = Math.min(img.height, y2);
+    return { crop: cropRect(img, x1, y1, x2, y2), tf: ([u, v]) => [u + x1, v + y1] };
+  }
+  function grayF(cv) {
+    const { width: w, height: h } = cv, d = cv.getContext("2d").getImageData(0, 0, w, h).data, g = new Float32Array(w * h);
+    for (let i = 0; i < w * h; i++) g[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+    return { w, h, g };
+  }
+
+  // 스프링 제본 무늬 점수 (spiral_score): 책등을 따라 5~45px 간격으로 반복되는 가로 줄무늬의 세기
+  function spiralScore(crop) {
+    const { w, h, g } = grayF(crop);
+    if (h < 64 || w < 8) return 0;
+    const R = (i, n) => (i < 0 ? -i : i >= n ? 2 * n - 2 - i : i);   // BORDER_REFLECT_101
+    const x0 = Math.floor(w / 6), x1 = w - Math.floor(w / 6), prof = new Float64Array(h);
+    for (let y = 0; y < h; y++) {
+      let s = 0;
+      for (let x = x0; x < x1; x++) {
+        const px = (yy, xx) => g[R(yy, h) * w + R(xx, w)];
+        const gy = (px(y + 1, x - 1) + 2 * px(y + 1, x) + px(y + 1, x + 1)) - (px(y - 1, x - 1) + 2 * px(y - 1, x) + px(y - 1, x + 1));
+        s += Math.abs(gy);
+      }
+      prof[y] = s / Math.max(1, x1 - x0);
+    }
+    const n = h, p2 = new Float64Array(n);
+    for (let y = 0; y < n; y++) { let s = 0; for (let k = -15; k <= 15; k++) s += prof[R(y + k, n)]; p2[y] = prof[y] - s / 31; }
+    for (let y = 0; y < n; y++) p2[y] *= n > 1 ? 0.5 - 0.5 * Math.cos(2 * Math.PI * y / (n - 1)) : 1;
+    const K = Math.floor(n / 2) + 1, spec = new Float64Array(K);
+    for (let k = 0; k < K; k++) { let re = 0, im = 0; const a = -2 * Math.PI * k / n; for (let t = 0; t < n; t++) { re += p2[t] * Math.cos(a * t); im += p2[t] * Math.sin(a * t); } spec[k] = re * re + im * im; }
+    let mx = 0, tot = 0;
+    for (let k = 1; k < K; k++) { tot += spec[k]; const f = k / n; if (f > 1 / 45 && f < 1 / 5 && spec[k] > mx) mx = spec[k]; }
+    return mx / (tot + 1e-6);
+  }
+
+  // ---------------------------------------------------------------- Step 1 규칙
+  function fuseBoxes(dets, nPass, thr = 0.55) {
+    const cl = [];
+    for (const [b, c, k] of [...dets].sort((x, y) => y[1] - x[1])) {
+      let best = null, bi = -1;
+      for (const C of cl) { const v = iou(C.bbox, b); if (v > bi) { bi = v; best = C; } }
+      if (best && bi >= thr) {
+        best.members.push([b, c, k]);
+        let ws = 0; const s = [0, 0, 0, 0];
+        for (const [mb, mc] of best.members) { ws += mc; for (let j = 0; j < 4; j++) s[j] += mb[j] * mc; }
+        best.bbox = s.map((v) => v / ws);
+      } else cl.push({ bbox: [...b], members: [[b, c, k]] });
+    }
+    return cl.map((C) => { const pp = {}; for (const [, c, k] of C.members) pp[k] = Math.max(pp[k] || 0, c); return { bbox: C.bbox, support: Object.values(pp).reduce((a, b) => a + b, 0) / Math.max(1, nPass), votes: Object.keys(pp).length }; });
+  }
+  const coverShaped = (c) => { const [w, h] = wh(c); return h >= 0.9 * w; };
+  function resolveContainment(cands, inside = 0.8) {
+    cands = [...cands].sort((a, b) => area(b.bbox) - area(a.bbox));
+    const removed = new Set(), added = [];
+    for (let i = 0; i < cands.length; i++) {
+      if (removed.has(i)) continue;
+      const B = cands[i], aB = area(B.bbox), [wB, hB] = wh(B);
+      const inner = []; for (let j = 0; j < cands.length; j++) if (j !== i && !removed.has(j) && area(cands[j].bbox) < 0.85 * aB && inter(cands[j].bbox, B.bbox) >= inside * area(cands[j].bbox)) inner.push(j);
+      const big = inner.filter((j) => area(cands[j].bbox) >= 0.25 * aB && coverShaped(cands[j])).sort((x, y) => cands[y].support - cands[x].support);
+      const split = [];
+      for (const j of big) if (split.every((k) => inter(cands[j].bbox, cands[k].bbox) < 0.2 * area(cands[j].bbox))) split.push(j);
+      if (split.length >= 2 && split.reduce((s, j) => s + area(cands[j].bbox), 0) >= 0.6 * aB) { removed.add(i); continue; }
+      if (split.length === 1) {
+        const J = cands[split[0]], [wJ, hJ] = wh(J), [x1, y1, x2, y2] = B.bbox, [jx1, , jx2] = J.bbox;
+        const rest = (jx1 + jx2) / 2 > (x1 + x2) / 2 ? [x1, y1, jx1, y2] : [jx2, y1, x2, y2], rw = rest[2] - rest[0];
+        if (wB >= 0.9 * hB && hJ >= 0.85 * hB && rw >= 0.6 * wJ && hB >= 0.9 * rw) { removed.add(i); added.push({ ...B, bbox: rest }); continue; }
+        if (area(J.bbox) >= 0.5 * aB && J.support >= 0.8 * B.support) { removed.add(i); continue; }
+      }
+      for (const j of inner) removed.add(j);
+    }
+    return cands.filter((_, i) => !removed.has(i)).concat(added);
+  }
+  function mergeBelts(cands, gap = 0.03) {
+    cands = [...cands]; let merged = true;
+    while (merged) {
+      merged = false;
+      outer: for (let i = 0; i < cands.length; i++) for (let j = 0; j < cands.length; j++) {
+        if (i === j) continue;
+        const a = cands[i], b = cands[j], [ax1, ay1, ax2, ay2] = a.bbox, [bx1, by1, bx2, by2] = b.bbox;
+        if (ay1 > by1) continue;
+        const xo = Math.min(ax2, bx2) - Math.max(ax1, bx1), [aw, ah] = wh(a), [bw, bh] = wh(b);
+        const touching = by1 - ay2 <= gap * Math.max(ah, bh) * 3 && by1 >= ay1 + 0.5 * ah, strip = bh < 0.6 * bw || ah < 0.6 * aw;
+        if (xo >= 0.85 * Math.max(aw, bw) && touching && strip) {
+          cands[i] = { ...a, bbox: [Math.min(ax1, bx1), ay1, Math.max(ax2, bx2), Math.max(ay2, by2)], support: Math.max(a.support, b.support) };
+          cands.splice(j, 1); merged = true; break outer;
+        }
+      }
+    }
+    return cands;
+  }
+  function splitWide(fused, accepted, thr, maxAspect) {
+    if (!accepted.length) return [];
+    const medW = median(accepted.map((c) => wh(c)[0])), out = [];
+    for (const Wb of fused) {
+      const [w, h] = wh(Wb); if (Wb.support < thr || w / Math.max(1, h) <= maxAspect) continue;
+      const [x1, y1, x2, y2] = Wb.bbox;
+      for (const J of accepted) {
+        const [jx1, jy1, jx2, jy2] = J.bbox; if (Math.min(y2, jy2) - Math.max(y1, jy1) < 0.6 * h) continue;
+        let rest;
+        if (jx1 <= x1 + 0.05 * w && x1 + 0.1 * w <= jx2 && jx2 < x2) rest = [jx2, y1, x2, y2];
+        else if (jx2 >= x2 - 0.05 * w && x1 < jx1 && jx1 <= x2 - 0.1 * w) rest = [x1, y1, jx1, y2];
+        else continue;
+        const R = { bbox: rest, support: Wb.support, votes: Wb.votes, tier: "A" };
+        if (wh(R)[0] >= 0.5 * medW && accepted.concat(out).every((k) => inter(rest, k.bbox) < 0.2 * area(rest))) out.push(R);
+      }
+    }
+    return out;
+  }
+  function textOrientation(polys) {
+    let hz = 0, vt = 0;
+    for (const p of polys) { const [x1, y1, x2, y2] = bboxOf(p), w = x2 - x1, h = y2 - y1; if (w >= 1.3 * h) hz += w; else if (h >= 1.3 * w) vt += h; }
+    return [hz + vt ? hz / (hz + vt) : 0, polys.length];
+  }
+  function orderBooks(books) {
+    if (!books.length) return books;
+    const band = Math.max(1, 0.5 * median(books.map((b) => b.bbox[3] - b.bbox[1]))), rows = [];
+    for (const b of [...books].sort((p, q) => (p.bbox[1] + p.bbox[3]) - (q.bbox[1] + q.bbox[3]))) {
+      const cy = (b.bbox[1] + b.bbox[3]) / 2, R = rows[rows.length - 1];
+      if (R && Math.abs(cy - R[0]) < band) { R[1].push(b); R[0] = R[1].reduce((s, x) => s + (x.bbox[1] + x.bbox[3]) / 2, 0) / R[1].length; }
+      else rows.push([cy, [b]]);
+    }
+    return rows.flatMap(([, r]) => r.sort((p, q) => p.bbox[0] - q.bbox[0]));
+  }
+  function boxBook(b, kind, score) {
+    const [x1, y1, x2, y2] = b, w = x2 - x1, h = y2 - y1;
+    return { kind, cx: x1 + w / 2, cy: y1 + h / 2, w, h, ang: 0, poly: [[x1, y1], [x2, y1], [x2, y2], [x1, y2]], score, short: Math.min(w, h), bbox: [...b] };
+  }
+  function mergeBooks(spines, covers, vbooks, coco, confirmSpines, coverScene) {
+    const nIn = (c) => spines.filter((s) => inter(s.bbox, c.bbox) > 0.5 * area(s.bbox)).length;
+    covers = covers.filter((c) => nIn(c) <= 1);
+    const single = vbooks.filter((v) => nIn(v) <= 1), out = [];
+    for (const s of spines) {
+      const a = area(s.bbox);
+      if (covers.some((c) => inter(s.bbox, c.bbox) > 0.5 * a)) continue;
+      if (coverScene && (covers.some((c) => inter(s.bbox, c.bbox) > 0.25 * a) || single.some((v) => inter(s.bbox, v.bbox) > 0.5 * a))) continue;
+      if (confirmSpines && coco.length && !coco.some((b) => inter(s.bbox, b) > 0.2 * a)) continue;
+      out.push(s);
+    }
+    for (const v of vbooks) {
+      const taken = out.concat(covers);
+      if (taken.some((t) => inter(v.bbox, t.bbox) > 0.3 * Math.min(area(v.bbox), area(t.bbox)))) continue;
+      out.push(v);
+    }
+    return orderBooks(out.concat(covers));
+  }
+
+  async function verifySpines(img, spines, coverScene, rt) {
+    const kept = [];
+    for (const s of spines) {
+      await breathe();
+      const { crop } = cropUpright(img, s);
+      [s.horizontal, s.nText] = textOrientation(await rt.textDet(crop));
+      s.spiral = spiralScore(crop) >= 0.2 && s.nText <= 1;
+      const L = Math.max(s.w, s.h), S = Math.max(1, Math.min(s.w, s.h));
+      const ok = coverScene ? s.nText >= 2 && s.horizontal < 0.5
+        : L / S >= 2.5 && (s.spiral || (s.score >= 0.65 ? s.nText >= 1 : s.nText >= 2));
+      if (ok) kept.push(s);
+    }
+    kept.sort((a, b) => b.score - a.score);
+    let out = [];
+    for (const s of kept) { const a = polyArea(s.poly); if (out.every((o) => polyInter(s.poly, o.poly) < 0.5 * a)) out.push(s); }
+    if (!coverScene && out.length >= 5) {
+      const vov = (a, b) => Math.max(0, Math.min(a.bbox[3], b.bbox[3]) - Math.max(a.bbox[1], b.bbox[1]));
+      out = out.filter((s) => out.some((o) => o !== s && vov(s, o) >= 0.5 * (s.bbox[3] - s.bbox[1])));
+      const tol = 0.15 * median(out.map((o) => Math.max(o.w, o.h)));
+      out = out.filter((s) => out.filter((o) => o !== s && Math.abs(s.bbox[3] - o.bbox[3]) <= tol).length >= 2);
+    }
+    return out;
+  }
+
+  async function coverCandidates(img, spines, rt) {
+    const W = img.width, H = img.height, dets = [];
+    let passes = 0;
+    for (const r180 of CFG.coverRot180 ? [false, true] : [false]) for (const sz of CFG.coverSizes) {
+      for (const [x1, y1, x2, y2, c] of await rt.cover(img, sz, r180, CFG.coverConf)) dets.push([[x1, y1, x2, y2], c, passes]);
+      passes++;
+    }
+    const fused = fuseBoxes(dets, passes);
+    const spineScene = spines.filter((s) => s.score >= 0.7).length >= 8;
+    const thr = spineScene ? CFG.spineSceneSupport : CFG.minSupport;
+    const shapeOk = (c) => { const [w, h] = wh(c); return Math.max(w, h) / Math.max(1, Math.min(w, h)) <= CFG.maxAspect && w * h >= CFG.minArea * W * H; };
+    const A = fused.filter((c) => c.support >= thr && shapeOk(c)).map((c) => ({ ...c, tier: "A" }));
+    let pool = A, similar = null;
+    if (A.length >= 3 && !spineScene) {
+      const medA = median(A.map((c) => area(c.bbox))), medR = median(A.map((c) => wh(c)[1] / Math.max(1, wh(c)[0])));
+      similar = (c) => { const [w, h] = wh(c); return w * h / medA >= 0.4 && w * h / medA <= 1.8 && (h / Math.max(1, w)) / medR >= 0.7 && (h / Math.max(1, w)) / medR <= 1.4; };
+      const B = fused.filter((c) => thr > c.support && c.support >= 0.03 && c.votes >= 2 && shapeOk(c) && similar(c)).map((c) => ({ ...c, tier: "B" }));
+      pool = A.concat(B);
+    }
+    let cands = mergeBelts(resolveContainment(pool));
+    if (A.length >= 3 && !spineScene) {
+      cands = cands.concat(splitWide(fused, cands, thr, CFG.maxAspect));
+      for (const c of [...fused].sort((a, b) => b.support - a.support)) {
+        if (c.support >= 0.03 || !shapeOk(c) || !similar(c)) continue;
+        const [x1, y1, x2, y2] = c.bbox;
+        const inRow = cands.some((k) => Math.min(y2, k.bbox[3]) - Math.max(y1, k.bbox[1]) >= 0.6 * (y2 - y1));
+        const free = cands.every((k) => inter(c.bbox, k.bbox) < 0.2 * Math.min(area(c.bbox), area(k.bbox)));
+        if (inRow && free) cands.push({ ...c, tier: "C" });
+      }
+    }
+    return { cands, coco: fused.filter((c) => c.support >= 0.03).map((c) => c.bbox), fused };
+  }
+
+  // Step 1 전체: 책등 + 표지 후보 → 정리 → 글자 방향 검사 → 병합
+  async function detectBooks(img, rt) {
+    let spines = (await rt.spine(img, CFG.spine)).filter((s) => Math.max(s.w, s.h) / Math.max(1e-6, Math.min(s.w, s.h)) >= CFG.spine.minAspect);
+    spines = spines.map((s) => { const poly = boxPoly(s); return { ...s, kind: "spine", poly, bbox: bboxOf(poly), short: Math.min(s.w, s.h) }; });
+    const { cands: cands0, coco, fused } = await coverCandidates(img, spines, rt);
+    for (const c of cands0) {
+      await breathe();
+      const [x1, y1, x2, y2] = c.bbox.map(Math.round);
+      [c.horizontal, c.nText] = textOrientation(await rt.textDet(cropRect(img, Math.max(0, x1), Math.max(0, y1), Math.min(img.width, x2), Math.min(img.height, y2))));
+    }
+    const nHz = cands0.filter((c) => c.horizontal >= 0.5).length;
+    const coverScene = nHz >= 4 && nHz >= 0.5 * spines.filter((s) => s.score >= 0.7).length;
+    spines = await verifySpines(img, spines, coverScene, rt);
+    const keep = (c) => {
+      if (c.tier === "C") return c.horizontal >= 0.5;
+      if (c.nText > 0) return true;
+      return coverScene && c.tier === "A" && coverShaped(c) && !spines.some((s) => inter(c.bbox, s.bbox) > 0.2 * Math.min(area(c.bbox), area(s.bbox)));
+    };
+    const cands = cands0.filter(keep), covers = [], vbooks = [];
+    for (const c of cands) {
+      const [w, h] = wh(c);
+      const isCover = c.horizontal >= 0.5 || c.nText === 0 || (coverScene && w >= 1.1 * h);
+      if (!coverScene && w > h && (isCover || h < 1.1 * w)) continue;
+      if (!coverScene && !isCover && h < 2.5 * w) continue;
+      (isCover ? covers : vbooks).push(boxBook(c.bbox, isCover ? "cover" : "spine", c.support));
+    }
+    const books = mergeBooks(spines, covers, vbooks, coco, true, coverScene);
+    return { books, stages: { fused, candidates: cands0, coverScene } };
+  }
+
+  // ---------------------------------------------------------------- Step 2 E 제목 규칙
+  const LATIN = "[A-Za-z][A-Za-z0-9'&.\\-]*";
+  const scriptOf = (t) => { let ko = 0, en = 0; for (const ch of t) { if (ch >= "가" && ch <= "힣") ko++; else if (/[A-Za-z]/.test(ch)) en++; } return ko && en ? "mix" : ko ? "ko" : en ? "en" : ""; };
+  function mergeMixed(ko, en) {
+    const ew = en.match(new RegExp(LATIN, "g")) || []; let i = 0;
+    return ko.split(new RegExp(`(${LATIN})`)).map((tok) => (tok && new RegExp(`^${LATIN}$`).test(tok) ? (i < ew.length ? ew[i++] : (i++, tok)) : tok)).join("");
+  }
+  const clean = (t) => t.trim().replace(/^[^0-9A-Za-z가-힣]+|[^0-9A-Za-z가-힣]+$/g, "");
+  function readingOrder(boxes) {
+    if (!boxes.length) return boxes;
+    const bb = (b) => bboxOf(b.poly), band = 0.5 * median(boxes.map((b) => bb(b)[3] - bb(b)[1])), rows = [];
+    for (const b of [...boxes].sort((p, q) => (bb(p)[1] + bb(p)[3]) - (bb(q)[1] + bb(q)[3]))) {
+      const cy = (bb(b)[1] + bb(b)[3]) / 2, R = rows[rows.length - 1];
+      if (R && Math.abs(cy - R[0]) < band) R[1].push(b); else rows.push([cy, [b]]);
+    }
+    return rows.flatMap(([, r]) => r.sort((p, q) => bb(p)[0] - bb(q)[0]));
+  }
+  const ORIENTS = ["up", "down", "cw", "ccw"];
+  function orientedView(box, o, SP) {
+    if (o === "cw") return rot(box, 3);
+    if (o === "ccw") return rot(box, 1);
+    const im = o === "up" ? box : rot(box, 2);
+    if (im.height > 1.2 * im.width) { const rl = SP.relayoutVertical(im, mk, 1.0); return rl || im; }
+    return im;
+  }
+  function orientPoints(pts, o, W, H) {
+    return pts.map(([x, y]) => (o === "down" ? [W - x, H - y] : o === "cw" ? [y, W - x] : o === "ccw" ? [H - y, x] : [x, y]));
+  }
+  function* permutations(arr, n) {
+    if (n === 0) { yield []; return; }
+    for (let i = 0; i < arr.length; i++) for (const p of permutations(arr.slice(0, i).concat(arr.slice(i + 1)), n - 1)) yield [arr[i], ...p];
+  }
+  function decide(text, matcher) {
+    const m = matcher.match(text, 3, true); let s = m.length ? m[0].score : 0;
+    if (m.length && m[0].verified === false) s = Math.min(s, ACCEPT - 0.1);
+    return [s, m];
+  }
+
+  // 제목이 아닌 글자 (저자 · 출판사 · 시리즈명). 카탈로그 확정에 실패해 '글자로 읽은 제목'을 보여 줄 때만 사용
+  //  (1) 3글자 이상 항목은 읽은 글자에서 지움 (띄어쓰기·기호 무시)  예: "세계 문학 전집 파우스트" → "파우스트"
+  //  (2) 남은 글자가 항목과 자모 유사도 70 이상이면(2글자 이하 항목은 완전 일치) 제목이 아니라고 보고 Unknown  예: "좁지올" ≈ "조지 오웰"
+  let NON = [];
+  function setNonTitles(list, SP) {
+    NON = list.map((t) => t.trim()).filter((t) => t && !t.startsWith("#")).map((t) => SP.normalize(t)).filter((n) => n.length >= 2)
+      .map((n) => ({ n, j: SP.toJamo(n), re: n.length >= 3 ? new RegExp(n.split("").join("[^0-9A-Za-z가-힣]*"), "gi") : null }));
+  }
+  function stripNonTitle(text, SP) {
+    let t = text;
+    for (const x of NON) if (x.re) t = t.replace(x.re, " ");
+    t = clean(t.replace(/\s+/g, " "));
+    const q = SP.normalize(t); if (q.length < 2) return "";
+    const qj = SP.toJamo(q);
+    for (const x of NON) if (x.n.length <= 2 ? q === x.n : SP.ratio(qj, x.j) >= 70) return "";
+    return t;
+  }
+  async function readTitleE(crop, kind, matcher, rt, SP) {
+    const finish = (titleText, conf, s, m, view, calls, tb) => {
+      const t1 = m && m[0], confirmed = t1 && s >= ACCEPT ? t1.title : null;
+      const shown = stripNonTitle(titleText, SP);
+      const ocrOk = SP.normalize(shown).length >= 2 && !SP.isGarbage(shown) && conf >= CFG.minConf;
+      const [final, source] = confirmed ? [confirmed, "카탈로그"] : ocrOk ? [shown, "OCR"] : ["Unknown", "-"];
+      return { title: confirmed, raw: titleText, score: s, view, calls, noText: !titleText.trim(), top1: t1 ? t1.title : "", textBoxes: tb, final, source };
+    };
+    const polys = (await rt.textDet(crop)).filter((p) => rectShort(p) >= 6);
+    if (!polys.length) {
+      const vs = ORIENTS.map((o) => [o, orientedView(crop, o, SP)]);
+      const ko = await rt.recKo(vs.map((v) => v[1]));
+      let bi = 0; ko.forEach((r, i) => { if (r[1] > ko[bi][1]) bi = i; });
+      let [text, conf] = ko[bi], lang = scriptOf(text) || "-", view = vs[bi][0], calls = vs.length;
+      if (lang === "en" || lang === "mix") {
+        const en = await rt.recEn(vs.map((v) => v[1])); calls += vs.length;
+        let ei = 0; en.forEach((r, i) => { if (r[1] > en[ei][1]) ei = i; });
+        if (lang === "en") { text = en[ei][0]; conf = en[ei][1]; view = vs[ei][0]; } else text = mergeMixed(text, en[bi][0]);
+      }
+      text = clean(text);
+      const [s, m] = text ? decide(text, matcher) : [0, []];
+      return finish(text, conf, s, m, `책 전체 (${lang}, ${view})`, calls + 1, []);
+    }
+    const boxes = polys.map((p) => { const r = minAreaRect(p); return { poly: p, line: Math.min(r.w, r.h), rw: r.w, rh: r.h }; });
+    const cand = [...boxes].sort((a, b) => b.line - a.line).slice(0, CFG.maxRead);
+    const W = crop.width, H = crop.height;
+    const subs = cand.map((b) => { const [x1, y1, x2, y2] = bboxOf(b.poly).map((v) => Math.trunc(v)); return cropRect(crop, Math.max(0, x1 - 3), Math.max(0, y1 - 3), Math.min(W, x2 + 3), Math.min(H, y2 + 3)); });
+    // (0) 책 단위 글자 방향: 굵은 상자 orientBoxes개 × 4방향 → 신뢰도 × 글줄 굵기 합이 최대인 방향
+    const nO = Math.min(CFG.orientBoxes, cand.length), jobs = [];
+    for (let i = 0; i < nO; i++) for (const o of ORIENTS) jobs.push([i, o]);
+    const res = await rt.recKo(jobs.map(([i, o]) => orientedView(subs[i], o, SP)));
+    const ko = new Map(jobs.map(([i, o], k) => [i + "|" + o, res[k]]));
+    let orient = ORIENTS[0], bestSum = -1;
+    for (const o of ORIENTS) { let s = 0; for (let i = 0; i < nO; i++) { const r = ko.get(i + "|" + o); if (r[0].trim()) s += r[1] * cand[i].line; } if (s > bestSum) { bestSum = s; orient = o; } }
+    let calls = 1 + res.length;
+    const rest = []; for (let i = nO; i < cand.length; i++) rest.push(i);
+    if (rest.length) { const rr = await rt.recKo(rest.map((i) => orientedView(subs[i], orient, SP))); rest.forEach((i, k) => ko.set(i + "|" + orient, rr[k])); calls += rest.length; }
+    const enJobs = cand.map((_, i) => i).filter((i) => ["en", "mix"].includes(scriptOf(ko.get(i + "|" + orient)[0])));
+    const en = new Map();
+    if (enJobs.length) { const er = await rt.recEn(enJobs.map((i) => orientedView(subs[i], orient, SP))); enJobs.forEach((i, k) => en.set(i, er[k])); calls += enJobs.length; }
+    cand.forEach((b, i) => {
+      const [kt, ks] = ko.get(i + "|" + orient), sc = scriptOf(kt);
+      if (sc === "en") { b.text = clean(en.get(i)[0]); b.conf = en.get(i)[1]; b.lang = "en"; }
+      else if (sc === "mix") { b.text = clean(mergeMixed(kt, en.get(i)[0])); b.conf = ks; b.lang = "mix"; }
+      else { b.text = clean(kt); b.conf = ks; b.lang = sc || "-"; }
+      b.size = b.text ? Math.sqrt(b.rw * b.rh / Math.max(1, SP.normalize(b.text).length)) : 0;
+      b.upright = orientPoints(b.poly, orient, W, H);
+    });
+    const read = cand.filter((b) => b.text);
+    let title = [];
+    if (read.length) {
+      const big = Math.max(...read.map((b) => b.size)), small = Math.min(...read.map((b) => b.size));
+      const cut = big >= CFG.ratio * small ? big / 2 : 0.8 * big;
+      title = read.filter((b) => b.size >= cut).sort((a, b) => b.size - a.size).slice(0, CFG.maxBoxes);
+      title = readingOrder(title.map((b) => ({ poly: b.upright, ref: b }))).map((t) => t.ref);
+    }
+    const titleText = title.map((b) => b.text).join(" ");
+    let best = [0, []];
+    let texts = [titleText, ...title.map((b) => b.text)];
+    texts = texts.concat(texts.filter((t) => scriptOf(t) === "mix").map((t) => t.replace(/[^가-힣0-9 ]/g, " ")), texts.filter((t) => scriptOf(t) === "mix").map((t) => t.replace(/[^A-Za-z0-9 ]/g, " ")));
+    for (const t of texts) if (t.trim()) { const d = decide(t, matcher); if (d[0] > best[0]) best = d; }
+    if (best[0] < ACCEPT) {
+      const top3 = [...read].sort((a, b) => b.size - a.size).slice(0, 3);
+      for (let n = 2; n <= top3.length; n++) for (const combo of permutations(top3, n)) { const d = decide(combo.map((b) => b.text).join(" "), matcher); if (d[0] > best[0]) best = d; }
+    }
+    const conf = title.length ? title.reduce((s, b) => s + b.conf, 0) / title.length : 0;
+    const langs = [...new Set(title.map((b) => b.lang))].sort().join("/") || "-";
+    const tb = boxes.map((b) => ({ poly: b.poly, text: b.text || "", selected: "text" in b, used: title.includes(b) }));
+    const names = { up: "정방향", down: "180°", cw: "시계 90°", ccw: "반시계 90°" };
+    return finish(titleText, conf, best[0], best[1], `${names[orient]} · 제목 ${title.length}상자 (${langs})`, calls, tb);
+  }
+
+  // 사진 한 장: Step 1 → 책마다 E
+  async function runE(img, matcher, rt, SP, onProgress) {
+    const t0 = performance.now();
+    onProgress && onProgress(0, "Step 1: 책 검출 중"); await new Promise((r) => setTimeout(r, 0));
+    const { books: found, stages } = await detectBooks(img, rt);
+    const tDet = performance.now() - t0, books = [];
+    for (let i = 0; i < found.length; i++) {
+      const bk = found[i];
+      onProgress && onProgress(0.15 + 0.85 * i / Math.max(1, found.length), `Step 2: 제목 읽는 중 ${i + 1}/${found.length}`);
+      lastYield = 0; await breathe();
+      const { crop, tf } = cropBook(img, bk);
+      let r;
+      if (bk.spiral) r = { title: null, raw: "", score: 0, view: "스프링 제본", calls: 0, noText: true, top1: "", textBoxes: [], final: "Unknown", source: "스프링 노트" };
+      else r = await readTitleE(crop, bk.kind, matcher, rt, SP);
+      r.textBoxes = r.textBoxes.map((b) => ({ ...b, poly: b.poly.map(tf) }));
+      books.push({ ...bk, ...r });
+    }
+    return { books, stages, tDet, tAll: performance.now() - t0, calls: books.reduce((s, b) => s + b.calls, 0) };
+  }
+
+  function init(mkFn) { mk = mkFn; }
+  return { CFG, init, runE, setNonTitles, stripNonTitle, detectBooks, readTitleE, minAreaRect, bboxOf, spiralScore, fuseBoxes, ACCEPT };
+})();
+if (typeof module !== "undefined") module.exports = EP;
+
+// 최종모델(E) 신경망 실행부: 책등 YOLO11n-OBB · 표지 YOLO11x · PP-OCRv5 det(DBNet) · PP-OCRv5 rec(한국어/영어)
+// ultralytics / PaddleOCR 전·후처리를 그대로 옮김 (letterbox, NMS, DB 후처리, CTC 디코딩)
+const ER = (() => {
+  const EPX = typeof EP !== "undefined" ? EP : require("./e_pipeline.js");
+  function make({ ort, mk, spineSess, coverSess, det, ko, en }) {
+    // det/ko/en: { run(shapeU32, Float32Array) -> {data, shape} } , ko/en 은 dict 포함
+    const getData = (cv) => cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data;
+
+    // ---- 검출기 입력 (letterbox, RGB 0~1). rect=true면 ultralytics auto 모드처럼 짧은 변을 32 배수까지만 채움
+    function letterbox(img, S, rect) {
+      const iw = img.width, ih = img.height, r = Math.min(S / iw, S / ih), w = Math.round(iw * r), h = Math.round(ih * r);
+      const CW = rect ? Math.ceil(w / 32) * 32 : S, CH = rect ? Math.ceil(h / 32) * 32 : S;
+      const px = Math.floor((CW - w) / 2), py = Math.floor((CH - h) / 2), c = mk(CW, CH), g = c.getContext("2d");
+      g.fillStyle = "rgb(114,114,114)"; g.fillRect(0, 0, CW, CH); g.drawImage(img, px, py, w, h);
+      const d = getData(c), n = CW * CH, f = new Float32Array(3 * n);
+      for (let i = 0; i < n; i++) { f[i] = d[i * 4] / 255; f[n + i] = d[i * 4 + 1] / 255; f[2 * n + i] = d[i * 4 + 2] / 255; }
+      return { t: new ort.Tensor("float32", f, [1, 3, CH, CW]), r, px, py };
+    }
+
+    // ---- 회전 박스 NMS (ultralytics probiou)
+    function probiou(p, q) {
+      const cov = (b) => { const a = b.w * b.w / 12, bb = b.h * b.h / 12, c = Math.cos(b.ang), s = Math.sin(b.ang); return [a * c * c + bb * s * s, a * s * s + bb * c * c, (a - bb) * c * s]; };
+      const [a1, b1, c1] = cov(p), [a2, b2, c2] = cov(q), eps = 1e-7;
+      const den = (a1 + a2) * (b1 + b2) - (c1 + c2) ** 2 + eps;
+      const t1 = ((a1 + a2) * (p.cy - q.cy) ** 2 + (b1 + b2) * (p.cx - q.cx) ** 2) / den * 0.25;
+      const t2 = ((c1 + c2) * (q.cx - p.cx) * (p.cy - q.cy)) / den * 0.5;
+      const t3 = Math.log(((a1 + a2) * (b1 + b2) - (c1 + c2) ** 2) / (4 * Math.sqrt(Math.max(a1 * b1 - c1 * c1, 0) * Math.max(a2 * b2 - c2 * c2, 0)) + eps) + eps) * 0.5;
+      const bd = Math.min(Math.max(t1 + t2 + t3, eps), 100);
+      return 1 - Math.sqrt(1 - Math.exp(-bd) + eps);
+    }
+    async function spine(img, cfg) {
+      const m = letterbox(img, cfg.imgsz, false), o = await spineSess.run({ images: m.t }), out = o[spineSess.outputNames[0]];
+      const N = out.dims[2], a = out.data, bs = [];
+      for (let i = 0; i < N; i++) {
+        const sc = a[4 * N + i]; if (sc < cfg.conf) continue;
+        bs.push({ cx: a[i], cy: a[N + i], w: a[2 * N + i], h: a[3 * N + i], ang: a[5 * N + i], score: sc });
+      }
+      bs.sort((x, y) => y.score - x.score);
+      // ultralytics nms_rotated: 점수순 정렬 후, 자신보다 점수가 높은 상자 중 하나라도 IoU ≥ 기준이면 제거 (triu 방식, 비탐욕)
+      const keep = [];
+      for (let i = 0; i < bs.length && keep.length < 300; i++) { let ok = true; for (let j = 0; j < i; j++) if (probiou(bs[j], bs[i]) >= cfg.iou) { ok = false; break; } if (ok) keep.push(bs[i]); }
+      return keep.map((b) => ({ cx: (b.cx - m.px) / m.r, cy: (b.cy - m.py) / m.r, w: b.w / m.r, h: b.h / m.r, ang: b.ang, score: b.score }));
+    }
+
+    // ---- 표지 후보: COCO 'book'(73)이 최고 클래스인 상자만, NMS IoU 0.7 (ultralytics 기본)
+    const api = {};
+    async function cover(img, S, rot180, conf) {
+      if (!coverSess) return [];
+      try { return await coverRun(img, S, rot180, conf); }
+      catch (e) { api.coverFail = "표지 검출 실행 실패로 책등만 검출했습니다 (" + (e && e.message ? e.message : e) + ")"; return []; }
+    }
+    async function coverRun(img, S, rot180, conf) {
+      let src = img;
+      if (rot180) { src = mk(img.width, img.height); const g = src.getContext("2d"); g.translate(img.width, img.height); g.rotate(Math.PI); g.drawImage(img, 0, 0); }
+      const m = letterbox(src, S, true), o = await coverSess.run({ images: m.t }), out = o[coverSess.outputNames[0]];
+      const N = out.dims[2], C = out.dims[1] - 4, a = out.data, bs = [];
+      for (let i = 0; i < N; i++) {
+        let bi = 0, bv = -1; for (let c = 0; c < C; c++) { const v = a[(4 + c) * N + i]; if (v > bv) { bv = v; bi = c; } }
+        if (bi !== 73 || bv <= conf) continue;
+        const cx = a[i], cy = a[N + i], w = a[2 * N + i], h = a[3 * N + i];
+        bs.push([cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2, bv]);
+      }
+      bs.sort((x, y) => y[4] - x[4]);
+      const iou = (p, q) => { const iw = Math.max(0, Math.min(p[2], q[2]) - Math.max(p[0], q[0])), ih = Math.max(0, Math.min(p[3], q[3]) - Math.max(p[1], q[1])), I = iw * ih; return I / ((p[2] - p[0]) * (p[3] - p[1]) + (q[2] - q[0]) * (q[3] - q[1]) - I); };
+      const keep = []; for (const b of bs) { if (keep.length >= 300) break; if (keep.every((k) => iou(k, b) <= 0.7)) keep.push(b); }
+      const W = img.width, H = img.height;
+      return keep.map(([x1, y1, x2, y2, c]) => {
+        let X1 = Math.min(W, Math.max(0, (x1 - m.px) / m.r)), Y1 = Math.min(H, Math.max(0, (y1 - m.py) / m.r)), X2 = Math.min(W, Math.max(0, (x2 - m.px) / m.r)), Y2 = Math.min(H, Math.max(0, (y2 - m.py) / m.r));
+        if (rot180) [X1, Y1, X2, Y2] = [W - X2, H - Y2, W - X1, H - Y1];
+        return [X1, Y1, X2, Y2, c];
+      });
+    }
+
+    // ---- PP-OCRv5 글자 영역 검출 (DetResizeForTest limit 960 max + DBPostProcess thresh .3 / box .6 / unclip 1.5)
+    function detOnce(cv) {
+      const h = cv.height, w = cv.width, ratio = Math.max(h, w) > 960 ? 960 / Math.max(h, w) : 1;
+      const RH = Math.max(Math.round(Math.trunc(h * ratio) / 32) * 32, 32), RW = Math.max(Math.round(Math.trunc(w * ratio) / 32) * 32, 32);
+      const c = mk(RW, RH), g = c.getContext("2d"); g.drawImage(cv, 0, 0, RW, RH);
+      const d = getData(c), n = RW * RH, f = new Float32Array(3 * n), mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225];
+      for (let i = 0; i < n; i++) { const bgr = [d[i * 4 + 2], d[i * 4 + 1], d[i * 4]]; for (let k = 0; k < 3; k++) f[k * n + i] = (bgr[k] / 255 - mean[k]) / std[k]; }
+      const o = det.run(new Uint32Array([1, 3, RH, RW]), f), P = o.data, Hm = o.shape[2], Wm = o.shape[3];
+      const lab = new Int32Array(Hm * Wm).fill(-1), polys = [];
+      for (let s = 0; s < Hm * Wm; s++) {
+        if (P[s] <= 0.3 || lab[s] >= 0) continue;
+        const stack = [s], pix = []; lab[s] = s;
+        while (stack.length) {
+          const q = stack.pop(), y = (q / Wm) | 0, x = q - y * Wm; pix.push([x, y]);
+          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+            const yy = y + dy, xx = x + dx; if (yy < 0 || xx < 0 || yy >= Hm || xx >= Wm) continue;
+            const t = yy * Wm + xx; if (P[t] > 0.3 && lab[t] < 0) { lab[t] = s; stack.push(t); }
+          }
+        }
+        if (polys.length >= 1000) break;
+        // 외곽 픽셀만으로 최소 외접 사각형
+        const edge = pix.filter(([x, y]) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => { const yy = y + b, xx = x + a; return yy < 0 || xx < 0 || yy >= Hm || xx >= Wm || P[yy * Wm + xx] <= 0.3; }));
+        let r = EPX.minAreaRect(edge.length >= 3 ? edge : pix);
+        if (Math.min(r.w, r.h) < 3) continue;
+        // box_score_fast: 사각형 안의 평균 확률
+        const [bx1, by1, bx2, by2] = EPX.bboxOf(r.pts).map((v, k) => (k % 2 ? Math.min(Hm - 1, Math.max(0, k < 2 ? Math.floor(v) : Math.ceil(v))) : Math.min(Wm - 1, Math.max(0, k < 2 ? Math.floor(v) : Math.ceil(v)))));
+        const c0 = Math.cos(r.ang), s0 = Math.sin(r.ang); let sum = 0, cnt = 0;
+        for (let y = by1; y <= by2; y++) for (let x = bx1; x <= bx2; x++) {
+          const u = (x - r.cx) * c0 + (y - r.cy) * s0, v = -(x - r.cx) * s0 + (y - r.cy) * c0;
+          if (Math.abs(u) <= r.w / 2 + 0.5 && Math.abs(v) <= r.h / 2 + 0.5) { sum += P[y * Wm + x]; cnt++; }
+        }
+        if (!cnt || sum / cnt < 0.6) continue;
+        const dist = r.w * r.h * 1.5 / (2 * (r.w + r.h));        // unclip: 면적 × 1.5 / 둘레 만큼 바깥으로
+        const W2 = r.w + 2 * dist, H2 = r.h + 2 * dist;
+        if (Math.min(W2, H2) < 5) continue;
+        const pts = [[-W2 / 2, -H2 / 2], [W2 / 2, -H2 / 2], [W2 / 2, H2 / 2], [-W2 / 2, H2 / 2]].map(([x, y]) => [r.cx + x * c0 - y * s0, r.cy + x * s0 + y * c0]);
+        polys.push(pts.map(([x, y]) => [Math.min(w, Math.max(0, Math.round(x / Wm * w))), Math.min(h, Math.max(0, Math.round(y / Hm * h)))]));
+      }
+      return polys;
+    }
+    async function textDet(cv) {
+      if (cv.height < 16 || cv.width < 16) return [];
+      let polys = detOnce(cv);
+      if (polys.length) return polys;
+      // 가늘고 긴 책등 → 정사각형 여백을 붙여 한 번 더 (좌표는 원래 크롭 기준)
+      const h = cv.height, w = cv.width, side = Math.max(h, w), ox = Math.floor((side - w) / 2), oy = Math.floor((side - h) / 2);
+      const d = getData(cv), vals = []; for (let i = 0; i < d.length; i += 4 * 7) vals.push(d[i], d[i + 1], d[i + 2]);
+      vals.sort((a, b) => a - b); const med = vals[vals.length >> 1] | 0;
+      const sq = mk(side, side), g = sq.getContext("2d"); g.fillStyle = `rgb(${med},${med},${med})`; g.fillRect(0, 0, side, side); g.drawImage(cv, ox, oy);
+      return detOnce(sq).map((p) => p.map(([x, y]) => [Math.min(w - 1, Math.max(0, x - ox)), Math.min(h - 1, Math.max(0, y - oy))]));
+    }
+
+    // ---- PP-OCRv5 인식 (높이 48, 폭 최소 320으로 0 채움, BGR, (x/255-0.5)/0.5) + CTC 디코딩(신뢰도 = 글자 확률 평균)
+    function recOne(model, cv) {
+      if (cv.width < 8 || cv.height < 8) return ["", 0];
+      const H = 48, ratio = cv.width / cv.height, Wt = Math.max(320, Math.floor(H * Math.max(320 / 48, ratio))), rw = Math.min(Wt, Math.ceil(H * ratio));
+      const c = mk(rw, H), g = c.getContext("2d"); g.drawImage(cv, 0, 0, rw, H);
+      const d = getData(c), f = new Float32Array(3 * H * Wt), n = H * Wt;
+      for (let y = 0; y < H; y++) for (let x = 0; x < rw; x++) { const i = (y * rw + x) * 4, j = y * Wt + x; f[j] = (d[i + 2] / 255 - 0.5) / 0.5; f[n + j] = (d[i + 1] / 255 - 0.5) / 0.5; f[2 * n + j] = (d[i] / 255 - 0.5) / 0.5; }
+      const o = model.run(new Uint32Array([1, 3, H, Wt]), f), T = o.shape[1], C = o.shape[2], p = o.data;
+      let s = "", prev = -1, ps = 0, pn = 0;
+      for (let t = 0; t < T; t++) {
+        let bi = 0, bv = -1; for (let k = 0; k < C; k++) { const v = p[t * C + k]; if (v > bv) { bv = v; bi = k; } }
+        if (bi !== prev && bi !== 0) { s += model.dict[bi] || ""; ps += bv; pn++; }
+        prev = bi;
+      }
+      return [s, pn ? ps / pn : 0];
+    }
+    // 인식 호출 사이마다 화면 갱신 틈을 줌 (휴대폰에서 진행 막대가 멈추지 않도록)
+    const recMany = async (model, cvs) => { const out = []; for (const c of cvs) { out.push(recOne(model, c)); await new Promise((r) => setTimeout(r, 0)); } return out; };
+    const recKo = (cvs) => recMany(ko, cvs);
+    const recEn = (cvs) => recMany(en, cvs);
+    return Object.assign(api, { spine, cover, textDet, recKo, recEn });
+  }
+  return { make };
+})();
+if (typeof module !== "undefined") module.exports = ER;
+
+</script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const CALLS_EARLY = 1.82;   // 조기 종료 실험에서 얻은 책 1권당 평균 OCR 호출 수
+  const BOOKS = 15;
+  const MODELS = [
+    { key: "det640_fp32", file: "det640_fp32.onnx", label: "검출기 640 FP32", kind: "det", size: 640 },
+    { key: "det640_int8", file: "det640_int8.onnx", label: "검출기 640 INT8 (QDQ)", kind: "det", size: 640 },
+    { key: "det1280_int8", file: "det1280_int8.onnx", label: "검출기 1280 INT8 (QDQ)", kind: "det", size: 1280 },
+    { key: "rec_int8", file: "rec_int8.onnx", label: "인식기 INT8 (QDQ)", kind: "rec" },
+  ];
+  const results = {}; const sessions = {}; const bytes = {};
+  let charset = [], recSamples = [], recInputs = null, sampleImgs = [], matcher = null, ignoreSet = new Set();
+  const mk = (w, h) => { const c = document.createElement("canvas"); c.width = Math.max(1, w); c.height = Math.max(1, h); return c; };
+  // iPhone 화면 크기(세로 기준 pt)별 기종. 2025년 기종까지 공개된 해상도 기준
+  const IPHONE_SCREENS = {
+    "375x667": ["iPhone SE (2세대)", "iPhone SE (3세대)"],
+    "375x812": ["iPhone 11 Pro / Pro Max", "iPhone 12 mini / 12", "iPhone 13 mini / 13"],
+    "414x896": ["iPhone 11", "iPhone 11 Pro / Pro Max"],
+    "390x844": ["iPhone 12 mini / 12", "iPhone 12 Pro / Pro Max", "iPhone 13 mini / 13", "iPhone 13 Pro / Pro Max", "iPhone 14 / 14 Plus", "iPhone 16e"],
+    "428x926": ["iPhone 12 Pro / Pro Max", "iPhone 13 Pro / Pro Max", "iPhone 14 / 14 Plus"],
+    "393x852": ["iPhone 14 Pro / Pro Max", "iPhone 15 / 15 Plus", "iPhone 15 Pro / Pro Max", "iPhone 16 / 16 Plus"],
+    "430x932": ["iPhone 14 Pro / Pro Max", "iPhone 15 / 15 Plus", "iPhone 15 Pro / Pro Max", "iPhone 16 / 16 Plus"],
+    "402x874": ["iPhone 16 Pro / Pro Max", "iPhone 17", "iPhone 17 Pro / Pro Max"],
+    "440x956": ["iPhone 16 Pro / Pro Max", "iPhone 17 Pro / Pro Max"],
+    "420x912": ["iPhone Air"],
+  };
+  let candAdded = false;
+  function addCandidateGroup() {
+    if (candAdded || !device.candidates || !device.candidates.length) return;
+    const sel = $("dPick"), og = document.createElement("optgroup"); og.label = "이 화면 크기와 일치하는 기종";
+    for (const n of device.candidates) { const o = document.createElement("option"); o.value = n; o.textContent = n; og.appendChild(o); }
+    sel.insertBefore(og, sel.children[1] || null); candAdded = true;
+  }
+  function pickedInfo(d) {
+    if (!d) return null;
+    const n = d.name;
+    const os = d.group === "iPhone" ? "iOS" : d.group === "iPad" ? "iPadOS" : d.group.startsWith("Galaxy") ? "Android" : /iPhone/.test(n) ? "iOS" : "Android";
+    const type = /Duo|Fold/.test(n) ? "폴더블 폰" : /Flip/.test(n) ? "폴더블 폰 (플립)" : d.group === "iPad" || d.group === "Galaxy Tab" || /태블릿/.test(n) ? "태블릿" : "바형 스마트폰";
+    return { os, type, foldable: /폴더블/.test(type) };
+  }
+  function setLocked(on) { for (const id of ["sec2", "sec3"]) $(id).classList.toggle("locked", on); }
+  function applyPick() {
+    const d = DEVICES.find((x) => x.name === $("dPick").value), P = pickedInfo(d);
+    const set = (id, v) => { const el = $(id); el.textContent = v || "선택 전"; el.classList.toggle("empty", !v); };
+    if (!P) { ["dOs", "dType", "dModel", "dSpec"].forEach((id) => set(id, "")); $("dWarn").hidden = true; setLocked(true); return; }
+    set("dOs", P.os); set("dType", P.type); set("dModel", d.name);
+    set("dSpec", d.chip === "-" ? "사양 정보 없음" : `${d.chip} · ${d.ram}${d.reported ? " · 보도 기준" : ""}`);
+    $("dFold").value = P.type === "태블릿" ? "tablet" : P.foldable ? "foldable" : "bar";
+    const known = ["iOS", "iPadOS", "Android"].includes(device.os);
+    $("dWarn").hidden = !(known && device.os !== P.os);
+    $("dWarn").textContent = `선택한 기기(${P.os})와 이 기기에서 감지된 운영체제(${device.os})가 다릅니다. 선택을 확인해 주세요.`;
+    setLocked(false);
+  }
+
+  // 기기 목록 채우기
+  (() => {
+    const sel = $("dPick"), groups = {};
+    for (const d of DEVICES) (groups[d.group] ||= []).push(d);
+    for (const [gname, list] of Object.entries(groups)) {
+      const og = document.createElement("optgroup"); og.label = gname;
+      for (const d of list) { const o = document.createElement("option"); o.value = d.name; o.textContent = d.name; og.appendChild(o); }
+      sel.appendChild(og);
+    }
+    sel.addEventListener("change", applyPick);
+  })();
+
+  // ---- 기기 판별 ----
+  const device = { os: "기타", type: "알 수 없음", model: "", folded: null, why: [] };
+  function detectDevice() {
+    const ua = navigator.userAgent, tp = navigator.maxTouchPoints || 0;
+    const sw = screen.width, sh = screen.height, dpr = window.devicePixelRatio || 1;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const short = Math.min(sw, sh), long = Math.max(sw, sh), ratio = long / short;
+    const vratio = Math.max(vw, vh) / Math.max(1, Math.min(vw, vh));
+    const uad = navigator.userAgentData;
+    device.why = [];
+    if (/Android/i.test(ua) || (uad && /Android/i.test(uad.platform || ""))) {
+      device.os = "Android";
+      const mobileTok = /Mobile/i.test(ua) || (uad && uad.mobile);
+      const foldModel = /SM-F9\d\d/i.test(device.model);
+      if (foldModel && vratio < 1.4) { device.type = "폴더블 (펼침)"; device.folded = false; device.why.push("폴더블 모델 코드 + 정사각형에 가까운 화면"); }
+      else if (foldModel) { device.type = "폴더블 (접힘)"; device.folded = true; device.why.push("폴더블 모델 코드 + 세로로 긴 화면"); }
+      else if (!mobileTok || short >= 600) { device.type = "태블릿"; device.why.push(!mobileTok ? "브라우저 정보에 Mobile 표시 없음" : "화면 짧은 변 600px 이상"); }
+      else if (vratio < 1.4) { device.type = "폴더블 (펼침 추정)"; device.folded = false; device.why.push("폰인데 화면 비율이 정사각형에 가까움"); }
+      else { device.type = "스마트폰"; device.why.push("Android + Mobile"); }
+      device.why.unshift("브라우저 정보에 Android");
+    } else if (/iPhone|iPod/.test(ua)) {
+      device.os = "iOS";
+      if (vratio < 1.4) { device.type = "iPhone 폴더블 (펼침 추정)"; device.folded = false; device.why.push("iPhone인데 화면 비율이 정사각형에 가까움"); }
+      else { device.type = "iPhone (바형 Or 폴더블)"; device.folded = null; device.why.push("세로로 긴 화면"); }
+      device.why.unshift("브라우저 정보에 iPhone");
+      device.model = device.model || "확인 불가 (iOS 비공개)";
+    } else if (/iPad/.test(ua) || (/Macintosh/.test(ua) && tp > 1)) {
+      device.os = "iPadOS"; device.type = "태블릿 (iPad)";
+      device.why.push(/iPad/.test(ua) ? "브라우저 정보에 iPad" : "Mac으로 표시되지만 터치 지원 → iPad");
+      device.model = device.model || "확인 불가 (iPadOS 비공개)";
+    } else if (/Macintosh|Windows|Linux|CrOS/.test(ua)) {
+      device.os = /Windows/.test(ua) ? "Windows" : /Macintosh/.test(ua) ? "macOS" : /CrOS/.test(ua) ? "ChromeOS" : "Linux";
+      device.type = tp > 0 ? "터치 PC" : "PC"; device.why.push("데스크톱 브라우저 정보");
+    }
+    if (!device.model) device.model = "확인 불가";
+    device.screen = { cssW: sw, cssH: sh, dpr, pxW: Math.round(sw * dpr), pxH: Math.round(sh * dpr), viewW: vw, viewH: vh, ratio: +ratio.toFixed(2), viewRatio: +vratio.toFixed(2), touch: tp };
+    const pw = Math.min(sw, sh), ph = Math.max(sw, sh);
+    device.candidates = device.os === "iOS" ? (IPHONE_SCREENS[pw + "x" + ph] || []) : [];
+    $("autoHint").textContent = `자동 감지: ${device.os} · ${device.type.replace(/^iPhone \(|\)$/g, "")} · 화면 ${pw}×${ph}` +
+      (device.os === "iOS" ? (device.candidates.length ? ` · 이 화면 크기의 기종: ${device.candidates.map((n) => n.replace(/^iPhone /, "")).join(", ")}` : " · 화면 크기로 기종을 좁힐 수 없음 (폴더블 또는 최신 기종)") : "");
+    addCandidateGroup(); applyPick();
+    
+  }
+  async function detectModel() {
+    try {
+      const uad = navigator.userAgentData;
+      if (uad && uad.getHighEntropyValues) {
+        const v = await uad.getHighEntropyValues(["model", "platformVersion"]);
+        if (v.model) device.model = v.model + (v.platformVersion ? ` (Android ${v.platformVersion.split(".")[0]})` : "");
+      }
+    } catch (_) {}
+    detectDevice();
+  }
+  function deviceRecord() {
+    const foldState = { bar: "바형 (일반 스마트폰)", foldable: "폴더블 폰", tablet: "태블릿" }[$("dFold").value] || "";
+    const spec = DEVICES.find((x) => x.name === $("dPick").value), P = pickedInfo(spec);
+    return { os: device.os, type: device.type, model: device.model, picked: $("dPick").value || "", pickedOs: P ? P.os : "", pickedType: P ? P.type : "", screenCandidates: device.candidates || [], chip: spec ? spec.chip : "", ram: spec ? spec.ram : "", specReported: spec ? spec.reported : false, foldState, folded: device.folded, screen: device.screen, ua: navigator.userAgent };
+  }
+  window.addEventListener("resize", () => detectDevice());
+  detectDevice(); detectModel();
+
+  async function fetchB64(f) {
+    let txt = null, err = null;
+    for (let k = 0; k < 3 && txt === null; k++) {   // 큰 파일은 휴대폰에서 끊길 수 있어 세 번까지 다시 받음
+      try { const r = await fetch(f, { cache: "force-cache" }); if (!r.ok) throw new Error("HTTP " + r.status); txt = (await r.text()).trim(); }
+      catch (e) { err = e; await new Promise((ok) => setTimeout(ok, 800)); }
+    }
+    if (txt === null) throw new Error(`${f} 내려받기 실패 (${err && err.message ? err.message : err})`);
+    if (Uint8Array.fromBase64) return Uint8Array.fromBase64(txt);
+    const bin = atob(txt), out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  async function fetchBuf(f) { const r = await fetch(f); if (!r.ok) throw new Error(f + " " + r.status); return new Uint8Array(await r.arrayBuffer()); }
+  function loadImg(src) { return new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = src; }); }
+  const median = (a) => { const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+  const p95 = (a) => { const s = [...a].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(s.length * 0.95))]; };
+  const fmt = (ms) => ms >= 1000 ? (ms / 1000).toFixed(2) + " s" : Math.round(ms) + " ms";
+
+  async function init() {
+    try {
+      if (!window.ort) throw new Error("ONNX Runtime 스크립트를 불러오지 못했습니다");
+      ort.env.wasm.numThreads = 1;
+      ort.env.wasm.wasmPaths = { mjs: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort-wasm-simd-threaded.mjs" };
+      ort.env.wasm.wasmBinary = await fetchBuf("ort-wasm-simd-threaded.wasm");
+      charset = (await (await fetch("charset.txt")).text()).split("\n");
+      recSamples = await (await fetch("rec_samples.json")).json();
+      const raw = await fetchB64("rec_inputs.f32.b64.txt");
+      recInputs = new Float32Array(raw.buffer, raw.byteOffset, raw.byteLength / 4);
+      sampleImgs = [await loadImg("shelf_001.jpg"), await loadImg("shelf_003.jpg")];
+      matcher = new SP.Matcher(await (await fetch("catalog.json")).json());
+      ignoreSet = new Set(await (await fetch("ignore_idx.json")).json());
+      for (const m of MODELS) { $("st").textContent = m.label + " 불러오는 중"; bytes[m.key] = await fetchB64(m.file + ".b64.txt"); }
+      $("rtstate").textContent = "준비됨"; $("rtdot").classList.add("ready"); $("st").textContent = "준비됐습니다. 화면을 켠 채로 측정 시작을 누르세요.";
+      $("run").disabled = false;
+    } catch (e) {
+      $("rtstate").textContent = "오류"; $("rtdot").classList.add("err"); $("st").textContent = "불러오기 실패: " + e.message;
+    }
+  }
+
+  // ---- 처리 시간 그래프 (A 빨간 실선, B 파란 실선) ----
+  let chartTab = 0;
+  function lineChart(list, xLabel, yLabel, x0 = 1) {
+    const W = 640, H = 300, L = 56, R = 18, T = 16, B = 42;
+    const n = Math.max(...list.map((d) => d.v.length)), all = list.flatMap((d) => d.v);
+    if (!n || !all.length) return "";
+    const raw = Math.max(...all) * 1.1, mag = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 2.5, 5, 10].map((k) => k * mag).find((st) => raw / st <= 5) || mag * 10, ymax = Math.ceil(raw / step) * step;
+    const xs = (i) => L + (n === 1 ? 0 : (i / (n - 1)) * (W - L - R)), ys = (v) => T + (1 - v / ymax) * (H - T - B);
+    let g = "";
+    for (let v = 0; v <= ymax + 1e-9; v += step) {
+      const y = ys(v).toFixed(1), lab = v >= 1000 ? (v / 1000).toFixed(v % 1000 ? 1 : 0) + "s" : Math.round(v) + "ms";
+      g += `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" style="stroke:var(--line)" stroke-width="1"/><text x="${L - 6}" y="${(+y + 4).toFixed(1)}" text-anchor="end" font-size="11" style="fill:var(--sub)">${lab}</text>`;
+    }
+    const every = Math.max(1, Math.ceil(n / 10));
+    for (let i = 0; i < n; i += every) g += `<text x="${xs(i).toFixed(1)}" y="${H - B + 16}" text-anchor="middle" font-size="11" style="fill:var(--sub)">${i + x0}</text>`;
+    g += `<text x="${(L + W - R) / 2}" y="${H - 6}" text-anchor="middle" font-size="11.5" style="fill:var(--sub)">${xLabel}</text>`;
+    g += `<text x="14" y="${(T + H - B) / 2}" text-anchor="middle" font-size="11.5" transform="rotate(-90 14 ${(T + H - B) / 2})" style="fill:var(--sub)">${yLabel}</text>`;
+    g += `<line x1="${L}" x2="${L}" y1="${T}" y2="${H - B}" style="stroke:var(--sub)" stroke-width="1"/><line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" style="stroke:var(--sub)" stroke-width="1"/>`;
+    for (const d of list) {
+      if (!d.v.length) continue;
+      const pts = d.v.map((v, i) => `${xs(i).toFixed(1)},${ys(v).toFixed(1)}`).join(" ");
+      g += `<polyline points="${pts}" fill="none" style="stroke:var(${d.c})" stroke-width="2.4" stroke-linejoin="round"/>`;
+      d.v.forEach((v, i) => { g += `<circle cx="${xs(i).toFixed(1)}" cy="${ys(v).toFixed(1)}" r="2.6" style="fill:var(${d.c})"/>`; });
+      const li = d.v.length - 1, lv = d.v[li];
+      g += `<text x="${Math.min(xs(li), W - R - 2).toFixed(1)}" y="${(ys(lv) - 8).toFixed(1)}" text-anchor="end" font-size="11" font-weight="700" style="fill:var(${d.c})">${fmt(lv)}</text>`;
+    }
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${yLabel} 그래프">${g}</svg>`;
+  }
+  const avg = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+  function renderChart(k) {
+    chartTab = k; const S = results.series; if (!S) return;
+    [0, 1, 2].forEach((i) => { const t = $("ct" + i); t.classList.toggle("on", i === k); t.setAttribute("aria-selected", String(i === k)); });
+    let html = "", desc = "";
+    if (k === 0) { html = lineChart([{ v: S.detA, c: "--ca" }, { v: S.detB, c: "--cb" }], "측정 회차", "검출 1회 시간"); desc = `책등 검출 1회 평균 · A(1280 입력) ${fmt(avg(S.detA))} · B(640 입력, INT8) ${fmt(avg(S.detB))}`; }
+    if (k === 1) { html = lineChart([{ v: S.bookA, c: "--ca" }, { v: S.bookB, c: "--cb" }], "책 번호", "책 1권 제목 인식 시간"); desc = `책 1권 평균 · A ${fmt(avg(S.bookA))} (OCR ${S.callsA}회) · B ${fmt(avg(S.bookB))} (OCR ${S.callsB}회, 조기 종료)`; }
+    if (k === 2) { html = lineChart([{ v: S.cumA, c: "--ca" }, { v: S.cumB, c: "--cb" }], "처리한 책 수 (0 = 검출 직후)", "누적 처리 시간", 0); desc = `예시 사진 1장 · A ${S.countA}권 감지, 제목 확인 ${S.okA}권, ${fmt(S.cumA[S.cumA.length - 1])} · B ${S.countB}권 감지, 제목 확인 ${S.okB}권, ${fmt(S.cumB[S.cumB.length - 1])}`; }
+    $("chart").innerHTML = html; $("chartDesc").textContent = desc;
+  }
+  [0, 1, 2].forEach((i) => $("ct" + i).addEventListener("click", () => renderChart(i)));
+
+  // ---- 진행 팝업 ----
+  // macOS 부팅 게이지처럼 부드럽게 차오르는 진행바: 실제 진행값(target)을 향해 보간하고, 대기 중에도 조금씩 전진
+  const PM = { shown: 0, target: 0, cap: 0, raf: 0, done: false };
+  const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function pmPaint() { const pct = Math.max(0, Math.min(100, PM.shown * 100)); $("pmBar").style.width = pct.toFixed(2) + "%"; $("pmPct").textContent = Math.floor(pct) + "%"; }
+  function pmTick() {
+    if (reduceMotion) { PM.shown = PM.target; pmPaint(); PM.raf = 0; return; }
+    if (!PM.done && PM.shown >= PM.target - 0.003 && PM.target < PM.cap) PM.target = Math.min(PM.cap, PM.target + 0.0006);
+    PM.shown += (PM.target - PM.shown) * (PM.done ? 0.22 : 0.07);
+    pmPaint();
+    PM.raf = $("pm").hidden ? 0 : requestAnimationFrame(pmTick);
+  }
+  // ---- 실행 로그: 단계가 바뀔 때마다 [시각 +경과] 기록, 오류는 메시지와 위치까지
+  const LOG = { t0: 0, lines: [], last: "", timer: 0 };
+  const hms = (d) => d.toTimeString().slice(0, 8);
+  const el = (ms) => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+  function logLine(msg, isErr) {
+    const now = new Date(), dt = LOG.t0 ? ((now - LOG.t0) / 1000).toFixed(1) : "0.0";
+    LOG.lines.push({ t: `[${hms(now)} +${dt}s] ${msg}`, err: !!isErr });
+    const pre = $("logPre"); if (!pre) return;
+    $("logBox").hidden = false;
+    pre.innerHTML = LOG.lines.map((l) => `<span class="${l.err ? "err" : ""}">${l.t.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c])}</span>`).join("\n");
+    pre.scrollTop = pre.scrollHeight;
+  }
+  function logError(where, e) {
+    const msg = e && e.message ? e.message : String(e);
+    logLine(`오류 (${where}): ${msg}`, true);
+    if (e && e.stack) logLine(String(e.stack).split("\n").slice(0, 4).join(" | "), true);
+    try { const mem = performance.memory; if (mem) logLine(`메모리 사용 ${(mem.usedJSHeapSize / 1e6).toFixed(0)}MB / 한도 ${(mem.jsHeapSizeLimit / 1e6).toFixed(0)}MB`, true); } catch (_) {}
+  }
+  window.addEventListener("error", (ev) => logError("페이지", ev.error || ev.message));
+  window.addEventListener("unhandledrejection", (ev) => logError("비동기 작업", ev.reason));
+  $("logCopy").addEventListener("click", async () => {
+    const txt = LOG.lines.map((l) => l.t).join("\n") + "\n" + navigator.userAgent;
+    try { await navigator.clipboard.writeText(txt); $("logCopy").textContent = "복사했습니다"; } catch (_) { $("logCopy").textContent = "길게 눌러 복사하세요"; }
+    setTimeout(() => { $("logCopy").textContent = "로그 복사"; }, 1500);
+  });
+  function showProgress(title) {
+    LOG.t0 = new Date(); LOG.last = "";
+    logLine(`시작: ${title.replace(/\n.*/s, "")} (시작 시각 ${hms(LOG.t0)})`);
+    const tick = () => { $("pmTime").textContent = `시작 ${hms(LOG.t0)} · 경과 ${el(Date.now() - LOG.t0)}`; };
+    tick(); clearInterval(LOG.timer); LOG.timer = setInterval(tick, 1000);
+    $("pmTitle").textContent = title;
+    PM.shown = 0; PM.target = 0; PM.cap = 0.03; PM.done = false; pmPaint(); $("pmStep").textContent = "준비 중";
+    $("pm").hidden = false; if (!PM.raf) PM.raf = requestAnimationFrame(pmTick);
+  }
+  function setProgress(f, step) {
+    const v = Math.max(0, Math.min(1, f));
+    if (v > PM.target) PM.target = v;
+    PM.cap = Math.min(0.99, Math.max(PM.cap, v + 0.04));
+    if (step) { $("pmStep").textContent = step; if (step !== LOG.last) { LOG.last = step; logLine(step); } }
+    if (reduceMotion) pmTick();
+  }
+  function hideProgress() {
+    clearInterval(LOG.timer);
+    if (LOG.t0) logLine(`종료 (총 경과 ${el(Date.now() - LOG.t0)})`);
+    PM.done = true; PM.target = 1; PM.cap = 1;
+    setTimeout(() => { $("pm").hidden = true; if (PM.raf) { cancelAnimationFrame(PM.raf); PM.raf = 0; } }, reduceMotion ? 0 : 450);
+  }
+
+  async function session(key) {
+    if (sessions[key]) return { s: sessions[key], load: 0 };
+    const t = performance.now();
+    sessions[key] = await ort.InferenceSession.create(bytes[key], { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
+    return { s: sessions[key], load: performance.now() - t };
+  }
+
+  // 검출기 입력: 레터박스 후 RGB 0~1, CHW
+  function detInput(img, S) {
+    const c = document.createElement("canvas"); c.width = S; c.height = S;
+    const g = c.getContext("2d"); g.fillStyle = "rgb(114,114,114)"; g.fillRect(0, 0, S, S);
+    const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+    const r = Math.min(S / iw, S / ih);
+    const w = Math.round(iw * r), h = Math.round(ih * r);
+    const px = Math.floor((S - w) / 2), py = Math.floor((S - h) / 2);
+    g.drawImage(img, px, py, w, h);
+    const d = g.getImageData(0, 0, S, S).data, n = S * S, f = new Float32Array(3 * n);
+    for (let i = 0; i < n; i++) { f[i] = d[i * 4] / 255; f[n + i] = d[i * 4 + 1] / 255; f[2 * n + i] = d[i * 4 + 2] / 255; }
+    return { t: new ort.Tensor("float32", f, [1, 3, S, S]), r, px, py };
+  }
+
+  // 출력 (1, 6, N): cx, cy, w, h, score, angle(rad)
+  function decode(out, meta, thr = 0.35) {
+    const [, , N] = out.dims, a = out.data, boxes = [];
+    for (let i = 0; i < N; i++) {
+      const sc = a[4 * N + i]; if (sc < thr) continue;
+      boxes.push({ cx: (a[i] - meta.px) / meta.r, cy: (a[N + i] - meta.py) / meta.r, w: a[2 * N + i] / meta.r, h: a[3 * N + i] / meta.r, ang: a[5 * N + i], sc });
+    }
+    boxes.sort((x, y) => y.sc - x.sc);
+    const keep = [];
+    const aabb = (b) => { const c = Math.abs(Math.cos(b.ang)), s = Math.abs(Math.sin(b.ang)); const hw = (b.w * c + b.h * s) / 2, hh = (b.w * s + b.h * c) / 2; return [b.cx - hw, b.cy - hh, b.cx + hw, b.cy + hh]; };
+    const iou = (p, q) => { // 회전 박스의 외접 사각형으로 겹침 계산 (각도 90° 근처에서 w/h가 뒤바뀌는 출력도 처리)
+      const A = aabb(p), B = aabb(q);
+      const iw = Math.max(0, Math.min(A[2], B[2]) - Math.max(A[0], B[0])), ih = Math.max(0, Math.min(A[3], B[3]) - Math.max(A[1], B[1]));
+      const inter = iw * ih; return inter / ((A[2] - A[0]) * (A[3] - A[1]) + (B[2] - B[0]) * (B[3] - B[1]) - inter);
+    };
+    for (const b of boxes) if (keep.every((k) => iou(k, b) < 0.5)) keep.push(b);
+    return keep;
+  }
+
+  function greedy(logits, steps, classes) {
+    let out = "", prev = -1;
+    for (let t = 0; t < steps; t++) {
+      let bi = 0, bv = -Infinity;
+      for (let c = 0; c < classes; c++) { const v = logits[t * classes + c]; if (v > bv) { bv = v; bi = c; } }
+      if (bi !== prev && bi !== 0) out += charset[bi] || "";
+      prev = bi;
+    }
+    return out;
+  }
+
+  async function timeIt(fn, warm, runs) { for (let i = 0; i < warm; i++) await fn(); const ts = []; for (let i = 0; i < runs; i++) { const t = performance.now(); await fn(); ts.push(performance.now() - t); } return ts; }
+
+  function render() {
+    $("tb").innerHTML = "";
+    for (const m of MODELS) {
+      const r = results[m.key]; if (!r) continue;
+      const tr = document.createElement("tr");
+      const cells = [m.label, (bytes[m.key].byteLength / 1e6).toFixed(1) + " MB", fmt(r.load), fmt(r.med), fmt(r.p95), r.note || ""];
+      cells.forEach((v, i) => { const td = document.createElement("td"); td.textContent = v; if (i >= 2 && i <= 4) td.className = "n"; tr.appendChild(td); });
+      $("tb").appendChild(tr);
+    }
+  }
+
+  function summary() {
+    const dr = deviceRecord(); const lines = ["[밀리의서재 사전과제 온디바이스 벤치] " + new Date().toISOString(), `지원자 신민석 · 기기: ${dr.picked || dr.type} / ${dr.os} / 모델 ${dr.model} / 화면 ${dr.foldState}`, "UA: " + navigator.userAgent, "cores: " + navigator.hardwareConcurrency];
+    for (const m of MODELS) { const r = results[m.key]; if (r) lines.push(`${m.label}: load ${fmt(r.load)}, median ${fmt(r.med)}, p95 ${fmt(r.p95)} ${r.note || ""}`); }
+    if (results.estFull) lines.push(`사진 1장 실측: A 초기 ${fmt(results.estFull)}, B 개선 ${fmt(results.estEarly)}`);
+    return lines.join("\n");
+  }
+
+  async function save() {
+    try {
+      const db = await claude.use("db");
+      if (!db) { $("saved").textContent = "결과 자동 저장을 쓸 수 없는 환경입니다. 결과 복사로 전달해 주세요."; return; }
+      const data = { at: new Date().toISOString(), device: deviceRecord(), ua: navigator.userAgent, cores: navigator.hardwareConcurrency || 0, booksAssumed: BOOKS, callsEarly: CALLS_EARLY, results: JSON.parse(JSON.stringify(results)) };
+      await db.collection("runs").add(data);
+      $("saved").innerHTML = '<span class="ok">결과를 저장했습니다.</span> 대화로 돌아가 측정이 끝났다고 알려주세요.';
+    } catch (e) { $("saved").textContent = "저장 실패(" + (e.code || e.message) + "). 결과 복사로 전달해 주세요."; }
+  }
+
+  $("run").addEventListener("click", async () => {
+    if (!$("dPick").value) { $("st").innerHTML = '<span class="bad">먼저 위의 기기 선택에서 기기를 골라 주세요.</span>'; $("dPick").focus(); $("dPick").scrollIntoView({ block: "center" }); return; }
+    $("run").disabled = true; $("copy").disabled = true; $("saved").textContent = "";
+    let wake = null; try { wake = await navigator.wakeLock?.request("screen"); } catch (_) {}
+    showProgress("처리 시간을 측정 중입니다.\n잠시만 기다려주세요.");
+    try {
+      let step = 0;
+      for (const m of MODELS.filter((x) => x.kind === "det")) {
+        $("st").textContent = m.label + " 측정 중"; setProgress(step * 0.15, m.label + " 측정 중"); step++;
+        const { s, load } = await session(m.key);
+        const meta = detInput(sampleImgs[0], m.size);
+        let n = 0;
+        const ts = await timeIt(async () => { const o = await s.run({ images: meta.t }); n = decode(o[s.outputNames[0]], meta).length; }, 2, 12);
+        results[m.key] = { load, med: median(ts), p95: p95(ts), note: `검출 ${n}권`, ts: ts.map((v) => Math.round(v)) };
+        render();
+      }
+      $("st").textContent = "인식기 INT8 측정 중"; setProgress(0.45, "인식기 측정 중");
+      const { s, load } = await session("rec_int8");
+      const ts = []; let ok = 0;
+      for (let round = 0; round < 3; round++) {
+        for (const smp of recSamples) {
+          const len = 64 * smp.w, x = new ort.Tensor("float32", recInputs.slice(smp.offset, smp.offset + len), [1, 1, 64, smp.w]);
+          const t = performance.now(); const o = await s.run({ image: x }); const dt = performance.now() - t;
+          if (round > 0) ts.push(dt);
+          if (round === 0) { const lg = o.logits; if (greedy(lg.data, lg.dims[1], lg.dims[2]) === smp.expected) ok++; }
+        }
+        setProgress(0.45 + 0.15 * (round + 1) / 3, "인식기 측정 중");
+      }
+      results.rec_int8 = { load, med: median(ts), p95: p95(ts), note: `입력 ${recSamples.length}종, 서버와 ${ok}/${recSamples.length} 일치` };
+      results.recMatch = `${ok}/${recSamples.length}`;
+      render();
+      // A·B 모델로 예시 책장 사진을 실제 처리하며 책별 시간 측정
+      $("st").textContent = "A·B 모델 실제 처리 측정 중";
+      const sim = mk(sampleImgs[0].naturalWidth, sampleImgs[0].naturalHeight); sim.getContext("2d").drawImage(sampleImgs[0], 0, 0);
+      const XA = await processModel(sim, "A", 0.6, 0.8), XB = await processModel(sim, "B", 0.8, 1.0);
+      const cum = (X) => { const out = [Math.round(X.tDet)]; let t = X.tDet; for (const r of X.rows) { t += r.ms; out.push(Math.round(t)); } return out; };
+      results.series = { detA: results.det1280_int8.ts, detB: results.det640_int8.ts, bookA: XA.rows.map((r) => Math.round(r.ms)), bookB: XB.rows.map((r) => Math.round(r.ms)), cumA: cum(XA), cumB: cum(XB),
+        countA: XA.boxes.length, countB: XB.boxes.length, okA: XA.rows.filter((r) => r.title).length, okB: XB.rows.filter((r) => r.title).length, callsA: XA.calls, callsB: XB.calls };
+      results.estFull = Math.round(XA.tAll); results.estEarly = Math.round(XB.tAll);
+      $("estFull").textContent = fmt(results.estFull); $("estEarly").textContent = fmt(results.estEarly);
+      $("chartWrap").hidden = false; renderChart(chartTab);
+      $("match").textContent = results.recMatch; $("est").hidden = false;
+      $("st").textContent = "측정을 마쳤습니다.";
+      $("copy").disabled = false;
+      await save();
+    } catch (e) { $("st").textContent = "측정 실패: " + e.message; }
+    finally { try { await wake?.release(); } catch (_) {} $("run").disabled = false; hideProgress(); }
+  });
+
+  $("copy").addEventListener("click", async () => {
+    const txt = summary();
+    try { await navigator.clipboard.writeText(txt); $("st").textContent = "결과를 복사했습니다."; }
+    catch (_) { const ta = document.createElement("textarea"); ta.value = txt; ta.style.width = "100%"; ta.rows = 8; $("st").after(ta); ta.select(); $("st").textContent = "아래 내용을 길게 눌러 복사하세요."; }
+  });
+
+  function drawImage(img, boxes, states, show) {
+    const cv = $("cv"), g = cv.getContext("2d"), iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+    const W = Math.min(1600, iw), H = Math.round(ih * W / iw), k = W / iw;
+    cv.width = W; cv.height = H; g.drawImage(img, 0, 0, W, H);
+    if (!boxes) return;
+    const css = getComputedStyle(document.documentElement);
+    const okC = css.getPropertyValue("--box").trim() || "#12a36b", unkC = css.getPropertyValue("--warn").trim() || "#d4870f";
+    g.lineWidth = Math.max(2, W / 450); g.font = `700 ${Math.max(14, W / 60)}px sans-serif`;
+    boxes.forEach((b, i) => {
+      if (show && !show[i]) return;
+      const col = !states ? okC : states[i] ? okC : unkC;
+      g.strokeStyle = col; g.fillStyle = col;
+      const c = Math.cos(b.ang), s = Math.sin(b.ang), hw = b.w / 2, hh = b.h / 2;
+      const pts = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(([x, y]) => [(b.cx + x * c - y * s) * k, (b.cy + x * s + y * c) * k]);
+      g.beginPath(); pts.forEach(([x, y], j) => j ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); g.stroke();
+      g.fillText(String(i + 1), b.cx * k - 6, Math.min(...pts.map((p) => p[1])) - 6);
+    });
+  }
+
+  async function runRec(x) {
+    const { s } = await session("rec_int8");
+    const o = await s.run({ image: new ort.Tensor("float32", x.data, [1, 1, 64, x.width]) });
+    return SP.decode(o.logits.data, o.logits.dims[1], o.logits.dims[2], charset, ignoreSet);
+  }
+
+  // A: 처음 적용한 구성 / B: 실험으로 개선한 구성
+  const CONFIGS = {
+    A: { label: "초기모델(A)", det: "det1280_int8", size: 1280, adaptive: false, opts: { clahe: false, early: false, verify: false, noText: false },
+         desc: "첫 실기기 버전: 검출기 1280 고정 입력(근거리 사진에서 책이 아닌 물체까지 과검출) · OCR 입력 3종 모두 판독 · 매칭 점수 72 이상이면 검증 없이 확정" },
+    B: { label: "개선모델(B)", det: "det640_int8", size: 640, adaptive: true, opts: { clahe: false, early: true, verify: true, noText: true },
+         desc: "검출기 INT8(3.2MB) + 원거리 촬영 시 1280 재검출 · 조기 종료 · 권차·점수 차·포함 관계 검증 · 글자 없는 책등 판별" },
+    D: { label: "PaddleOCR(D)", det: "det640_int8", size: 640, adaptive: true, rec: "pp5", opts: { clahe: false, early: true, verify: true, noText: true, prep: (im) => ppPrep(im) } },
+    E: { label: "최종모델(E)" },
+  };
+  // 탭마다 적용된 모델 구성 (인식 후 표시)
+  const SPEC = {
+    A: [["책등 검출", "YOLO11n-OBB · 1280 입력 고정 · INT8 3.5MB"], ["글자 인식", "EasyOCR 한국어 (korean_g2, CRNN+CTC) · INT8 10.4MB"], ["제목 확정", "매칭 점수 72 이상이면 바로 확정 · 3방향 모두 판독"], ["실행 엔진", "ONNX Runtime Web (WASM)"]],
+    B: [["책등 검출", "YOLO11n-OBB · 640 INT8 3.2MB, 원거리면 1280 재검출"], ["글자 인식", "EasyOCR 한국어 (korean_g2, CRNN+CTC) · INT8 10.4MB"], ["제목 확정", "조기 종료 · 권차·점수 차·포함 관계 검증 · 글자 없는 책등 판별"], ["실행 엔진", "ONNX Runtime Web (WASM)"]],
+    D: [["책등 검출", "YOLO11n-OBB · 640 INT8 3.2MB, 원거리면 1280 재검출 (B와 같음)"], ["글자 인식", "PaddleOCR PP-OCRv5 한국어 mobile (SVTR-LCNet+CTC) · FP32 13.5MB"], ["제목 확정", "B와 같은 검증 규칙"], ["실행 엔진", "검출 ONNX Runtime Web · 인식 rten (WASM)"]],
+    E: [["책등 검출", "YOLO11n-OBB 960 입력 (conf 0.45 · iou 0.5) · 가중치 INT8 3.2MB"],
+        ["표지 검출", "YOLO11x COCO 'book' 클래스 960 입력 1회 · 가중치 INT8 58MB"],
+        ["검출 정리", "표지 3단계 후보 · 포함 관계 · 띠지 병합 · 넓은 상자 분리 · 가로/세로 글줄 판정 · 스프링 노트(FFT) · 바닥 정렬"],
+        ["글자 검출", "PaddleOCR PP-OCRv5 mobile det (DBNet) 4.9MB"],
+        ["글자 인식", "PP-OCRv5 한국어 mobile 13.5MB + 영어 mobile 7.9MB · 책 단위 4방향 판단 · 큰 글씨만 제목"],
+        ["제목 확정", "카탈로그 확정 > 글자로 읽은 제목 > Unknown · 권차·점수 차·포함 관계 검증 · 저자·출판사·시리즈명은 제목으로 쓰지 않음"],
+        ["실행 엔진", "ONNX Runtime Web(검출) + rten(PaddleOCR) · WASM"],
+        ["PC와 다른 점", "표지 검출 1회(PC 6회) · 글자 방향은 굵은 글자 상자 2개로 판단(PC 6개)"]],
+  };
+  const AB = { A: null, B: null, D: null, E: null, img: null, view: "E", eView: 3 };
+  // ---- PaddleOCR PP-OCRv5 한국어 인식기 (rten WASM) ----
+  let PP = null, rtenReady = false;
+  async function initRten() { if (!rtenReady) { RTEN.initSync({ module: await fetchBuf("rten.wasm") }); rtenReady = true; } }
+  const rtenModel = (bytes, dict) => { const m = new RTEN.RtenModel(bytes); const o = { run: (shape, data) => { const r = m.run(shape, data); const out = { data: r.data, shape: Array.from(r.shape) }; try { r.free(); } catch (_) {} return out; } }; if (dict) o.dict = dict; return o; };
+  const fetchParts = async (names) => { const parts = []; for (const n of names) parts.push(await fetchB64(n)); const buf = new Uint8Array(parts.reduce((s, p) => s + p.length, 0)); let o = 0; for (const p of parts) { buf.set(p, o); o += p.length; } return buf; };
+  const fetchDict = async (f) => { const L = (await (await fetch(f)).text()).split("\n"); if (L[L.length - 1] === "") L.pop(); return ["", ...L, " "]; };
+  // ---- 최종모델(E) 신경망 (처음 한 번만 불러옴)
+  let ERT = null, coverErr = "";
+  async function ensureE(step) {
+    if (ERT) return ERT;
+    await ensurePP(); EP.init(mk);
+    try { EP.setNonTitles((await (await fetch("non_titles.txt")).text()).split("\n"), SP); } catch (e) { logError("제목 아님 목록", e); }
+    step("책등 검출기 불러오는 중");
+    const spineSess = await ort.InferenceSession.create(await fetchB64("e_spine960.onnx.b64.txt"), { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
+    step("표지 검출기 불러오는 중 (58MB, 처음 한 번)");
+    let coverSess = null;
+    try { coverSess = await ort.InferenceSession.create(await fetchParts(["e_cover.part1.b64.txt", "e_cover.part2.b64.txt", "e_cover.part3.b64.txt", "e_cover.part4.b64.txt", "e_cover.part5.b64.txt", "e_cover.part6.b64.txt"]), { executionProviders: ["wasm"], graphOptimizationLevel: "basic" }); }
+    catch (e) { coverErr = "표지 검출기를 불러오지 못해 책등만 검출했습니다 (" + (e && e.message ? e.message : e) + ")"; logError("표지 검출기 불러오기", e); }
+    step("글자 검출·영어 인식 모델 불러오는 중");
+    const det = rtenModel(await fetchB64("e_det.rten.b64.txt"));
+    const en = rtenModel(await fetchB64("e_en_rec.rten.b64.txt"), await fetchDict("e_en_dict.txt"));
+    const ko = { run: (shape, data) => { const r = PP.model.run(shape, data); const out = { data: r.data, shape: Array.from(r.shape) }; try { r.free(); } catch (_) {} return out; }, dict: PP.dict };   // D와 같은 한국어 인식기 공유
+    ERT = ER.make({ ort, mk, spineSess, coverSess, det, ko, en });
+    return ERT;
+  }
+  async function computeE(img, p0, p1) {
+    const span = p1 - p0, step = (t) => setProgress(p0 + span * 0.02, `최종모델(E): ${t}`);
+    const rt = await ensureE(step);
+    const R = await EP.runE(img, matcher, rt, SP, (f, t) => setProgress(p0 + span * (0.05 + 0.95 * f), `최종모델(E): ${t}`));
+    setProgress(p1, "최종모델(E): 완료");
+    logLine(`E 결과: ${R.books.length}권 · Step 1 ${(R.tDet / 1000).toFixed(1)}초 · 전체 ${(R.tAll / 1000).toFixed(1)}초 · 인식 호출 ${R.calls}회` + (rt.coverFail ? " · " + rt.coverFail : ""));
+    const rows = R.books.map((b) => ({ title: b.final !== "Unknown" ? b.final : null, src: b.source, kind: b.kind, noText: b.noText, spiral: b.source === "스프링 노트", raw: b.raw || "", view: b.view }));
+    return { ...R, boxes: R.books, rows };
+  }
+  // ---- 최종모델(E) 그림: 1 = Step 1 책 검출, 2 = Step 2 글자 검출, 3 = 최종 결과
+  const PAL = [[230, 25, 75], [60, 180, 75], [255, 225, 25], [0, 130, 200], [245, 130, 48], [145, 30, 180], [70, 240, 240], [240, 50, 230], [210, 245, 60], [250, 190, 212], [0, 128, 128], [220, 190, 255], [170, 110, 40], [128, 0, 0]];
+  function drawE(view, show) {
+    const R = AB.E, img = AB.img, cv = $("cv"), g = cv.getContext("2d"), W = img.width, H = img.height;
+    cv.width = W; cv.height = H; g.drawImage(img, 0, 0);
+    const lw = Math.max(2, W / 500), fs = Math.max(14, Math.round(W / 60)), path = (p) => { g.beginPath(); p.forEach(([x, y], j) => (j ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); };
+    const vis = R.books.map((_, i) => !show || show[i]);
+    if (view === 2) { g.fillStyle = "rgba(255,255,255,0.45)"; g.fillRect(0, 0, W, H); }
+    R.books.forEach((b, i) => {
+      if (!vis[i]) return;
+      const [r, gg, bb] = PAL[i % PAL.length];
+      if (view === 1) {
+        path(b.poly); g.fillStyle = `rgba(${r},${gg},${bb},0.45)`; g.fill();
+        if (b.kind === "cover") { g.lineWidth = lw + 3; g.strokeStyle = "#fff"; path(b.poly); g.stroke(); }
+        g.lineWidth = lw; g.strokeStyle = `rgb(${r},${gg},${bb})`; path(b.poly); g.stroke();
+      } else if (view === 2) {
+        g.lineWidth = 1; g.strokeStyle = "#969696"; path(b.poly); g.stroke();
+        for (const tb of b.textBoxes) if (!tb.used) { g.lineWidth = Math.max(1, lw - 1); g.strokeStyle = "rgb(0,180,230)"; path(tb.poly); g.stroke(); }
+        for (const tb of b.textBoxes) if (tb.used) { g.lineWidth = lw + 1; g.strokeStyle = "rgb(255,0,255)"; path(tb.poly); g.stroke(); }
+      } else {
+        const col = b.source === "카탈로그" ? [31, 122, 77] : b.source === "OCR" ? [31, 95, 209] : [150, 150, 150];
+        path(b.poly); g.fillStyle = `rgba(${col},0.30)`; g.fill(); g.lineWidth = lw; g.strokeStyle = `rgb(${col})`; path(b.poly); g.stroke();
+      }
+    });
+    g.font = `700 ${fs}px sans-serif`; g.textBaseline = "top";
+    R.books.forEach((b, i) => {
+      if (!vis[i]) return;
+      const xs = b.poly.map((p) => p[0]), ys = b.poly.map((p) => p[1]), t = String(i + 1), tw = g.measureText(t).width;
+      const x = xs.reduce((a, c) => a + c, 0) / 4 - tw / 2, y = Math.min(H - fs - 4, Math.max(2, Math.min(...ys) + 6));
+      g.fillStyle = "rgba(0,0,0,0.75)"; g.fillRect(x - 3, y - 2, tw + 6, fs + 4); g.fillStyle = "#fff"; g.fillText(t, x, y);
+    });
+    const nCv = R.books.filter((b) => b.kind === "cover").length, nCat = R.books.filter((b) => b.source === "카탈로그").length, nOcr = R.books.filter((b) => b.source === "OCR").length;
+    const cap = { 1: `Step 1 · 책 검출: 총 ${R.books.length}권 (책등 ${R.books.length - nCv} · 표지 ${nCv}) · 검출 ${(R.tDet / 1000).toFixed(1)}초`,
+                  2: `Step 2 · 글자 검출: 책마다 PP-OCRv5 det로 글자 영역을 찾고, 글자 크기가 큰 상자만 제목으로 사용`,
+                  3: `최종 결과: 제목 인식 ${nCat + nOcr} / ${R.books.length}권 (카탈로그 확정 ${nCat} · 글자로 읽은 제목 ${nOcr})` }[view];
+    const leg = { 1: [["rgba(230,25,75,.55)", "책마다 다른 색"], ["#fff;outline:2px solid #999", "흰 테두리 = 표지"]],
+                  2: [["rgb(255,0,255)", "제목으로 쓴 큰 글씨"], ["rgb(0,180,230)", "그 밖의 글자"]],
+                  3: [["rgb(31,122,77)", "카탈로그 확정"], ["rgb(31,95,209)", "글자로 읽은 제목"], ["rgb(150,150,150)", "Unknown"]] }[view];
+    $("cvCap").hidden = false; $("cvCap").textContent = cap + (coverErr || ERT && ERT.coverFail ? " · ⚠ " + (coverErr || ERT.coverFail) : "");
+    $("cvLeg").hidden = false; $("cvLeg").innerHTML = leg.map(([c, t]) => `<span><i style="background:${c}"></i>${t}</span>`).join("");
+  }
+  function redraw() {
+    const M = AB.view, R = AB[M]; if (!R) return; const f = AB.filter || "all", show = R.rows.map((r) => pass(r, f));
+    $("eViews").hidden = M !== "E";
+    if (M === "E") drawE(AB.eView, show);
+    else { $("cvCap").hidden = true; $("cvLeg").hidden = true; drawImage(AB.img, R.boxes, R.rows.map((r) => !!r.title), show); }
+  }
+  for (const [id, v] of [["ev1", 1], ["ev2", 2], ["ev3", 3]]) $(id).addEventListener("click", () => {
+    AB.eView = v; for (const [j, w] of [["ev1", 1], ["ev2", 2], ["ev3", 3]]) { $(j).classList.toggle("on", w === v); $(j).setAttribute("aria-selected", String(w === v)); }
+    redraw();
+  });
+  async function ensurePP() {
+    if (PP) return PP;
+    await initRten();
+    const a = await fetchB64("ppv5_rec.part1.b64.txt"), b = await fetchB64("ppv5_rec.part2.b64.txt");
+    const buf = new Uint8Array(a.length + b.length); buf.set(a, 0); buf.set(b, a.length);
+    const lines = (await (await fetch("ppv5_dict.txt")).text()).split("\n"); if (lines[lines.length - 1] === "") lines.pop();
+    PP = { model: new RTEN.RtenModel(buf), dict: ["", ...lines, " "] };
+    return PP;
+  }
+  // PP-OCR 입력: RGB, 높이 48, (x/255-0.5)/0.5
+  function ppPrep(cv) {
+    const H = 48, W = Math.max(16, Math.min(1600, Math.round(H * cv.width / cv.height)));
+    const c = mk(W, H), g = c.getContext("2d"); g.drawImage(cv, 0, 0, W, H);
+    const d = g.getImageData(0, 0, W, H).data, n = W * H, f = new Float32Array(3 * n);
+    for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) f[k * n + i] = (d[i * 4 + k] / 255 - 0.5) / 0.5;
+    return { data: f, width: W };
+  }
+  async function ppRun(x) {
+    const o = PP.model.run(new Uint32Array([1, 3, 48, x.width]), x.data), T = o.shape[1], C = o.shape[2], p = o.data;
+    let s = "", prev = -1;
+    for (let t = 0; t < T; t++) { let bi = 0, bv = -1; for (let c = 0; c < C; c++) { const v = p[t * C + c]; if (v > bv) { bv = v; bi = c; } } if (bi !== prev && bi !== 0) s += PP.dict[bi] || ""; prev = bi; }
+    try { o.free(); } catch (_) {}
+    return s;
+  }
+
+  // 결과 필터: all 전체 / ok 제목 확인 / no 제목 미인식
+  const pass = (r, f) => f === "all" || (f === "ok" ? !!r.title : !r.title);
+  function renderList(rows, f = "all") {
+    const ol = $("rList"); ol.innerHTML = "";
+    rows.forEach((r, i) => {
+      if (!pass(r, f)) return;
+      const li = document.createElement("li"), no = document.createElement("span"), t = document.createElement("span");
+      no.className = "no"; no.textContent = (i + 1) + "."; t.className = "t " + (r.title ? (r.src === "OCR" ? "ocr" : "ok") : "unk");
+      t.textContent = r.title || (r.spiral ? "제목 미인식 (스프링 노트)" : r.noText ? "제목 미인식 (글자 없는 책등)" : "제목 미인식");
+      if (r.kind) { const k = document.createElement("span"); k.className = "kind"; k.textContent = (r.kind === "cover" ? "표지" : "책등") + (r.src === "OCR" ? " · 글자로 읽음" : r.src === "카탈로그" ? " · 카탈로그" : ""); t.appendChild(k); }
+      li.append(no, t); ol.appendChild(li);
+    });
+    const ok = rows.filter((r) => r.title).length;
+    $("rCount").textContent = rows.length + "권"; $("rOk").textContent = ok + "권"; $("rNo").textContent = (rows.length - ok) + "권";
+    $("fnAll").textContent = rows.length; $("fnOk").textContent = ok; $("fnNo").textContent = rows.length - ok;
+    for (const [id, k] of [["f_all", "all"], ["f_ok", "ok"], ["f_no", "no"]]) { $(id).classList.toggle("on", k === f); $(id).setAttribute("aria-selected", String(k === f)); }
+    const shown = rows.filter((r) => pass(r, f)).length;
+    $("fEmpty").hidden = shown > 0;
+    $("fEmpty").textContent = f === "ok" ? "제목이 확인된 책이 없습니다." : "제목 미인식 책이 없습니다.";
+  }
+  function setFilter(f) {
+    AB.filter = f; const R = AB[AB.view]; if (!R) return;
+    redraw(); renderList(R.rows, f);
+  }
+  $("f_all").addEventListener("click", () => setFilter("all"));
+  $("f_ok").addEventListener("click", () => setFilter("ok"));
+  $("f_no").addEventListener("click", () => setFilter("no"));
+
+  function renderModel(M) {
+    const R = AB[M]; if (!R) return;
+    AB.view = M;
+    for (const k of ["A", "B", "D", "E"]) { const t = $("tab" + k); t.classList.toggle("on", k === M); t.setAttribute("aria-selected", String(k === M)); }
+    $("spec").innerHTML = `<dt class="h">${CONFIGS[M].label} 적용 모델</dt>` + SPEC[M].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+    const f = AB.filter || "all";
+    redraw(); renderList(R.rows, f); $("res").hidden = false;
+    $("cmp").innerHTML = "";
+    for (const k of ["E", "A", "B", "D"]) {
+      const X = AB[k]; if (!X) continue;
+      const d = document.createElement("div"); if (k === M) d.className = "on";
+      const ok = X.rows.filter((r) => r.title).length, n = X.boxes.length, sec = (ms) => (ms / 1000).toFixed(2);
+      d.innerHTML = `<b>${CONFIGS[k].label}</b><dl class="kv2"><dt>감지된 책(권)</dt><dd>${n}</dd><dt>제목 확인된 책(권)</dt><dd>${ok}</dd><dt>1권당 검출 시간(초)</dt><dd>${n ? sec(X.tAll / n) : "-"}</dd><dt>전체 소요시간(초)</dt><dd>${sec(X.tAll)}</dd></dl>`;
+      $("cmp").appendChild(d);
+    }
+  }
+  // 탭을 처음 누르면 같은 사진을 그 모델로 인식
+  async function openModel(M) {
+    if (!AB.img || busy) return;
+    if (!AB[M]) {
+      busy = true; let wake = null; try { wake = await navigator.wakeLock?.request("screen"); } catch (_) {}
+      showProgress(`${CONFIGS[M].label}로 인식 중입니다.\n잠시만 기다려주세요.`);
+      try { AB[M] = M === "E" ? await computeE(AB.img, 0, 1) : await processModel(AB.img, M, 0, 1); saveRun(M); }
+      catch (e) { logError($("pmStep").textContent, e); $("dst").hidden = false; $("dst").textContent = `인식 실패 [${$("pmStep").textContent}] ${e && e.message ? e.message : e} · 아래 실행 로그를 확인해 주세요`; }
+      finally { hideProgress(); try { await wake?.release(); } catch (_) {} busy = false; }
+    }
+    renderModel(M);
+  }
+  for (const M of ["A", "B", "D", "E"]) $("tab" + M).addEventListener("click", () => openModel(M));
+  async function saveRun(M) {
+    try {
+      const db = await claude.use("db"); if (!db) return; const X = AB[M];
+      const books = M === "E" ? X.books.map((b, i) => ({ no: i + 1, kind: b.kind, final: b.final, source: b.source, raw: (b.raw || "").slice(0, 80), view: b.view }))
+        : X.rows.map((r, i) => ({ no: i + 1, title: r.title || "", noText: !!r.noText, raw: (r.raw || "").slice(0, 80), score: r.score }));
+      await db.collection("detections").add({ at: new Date().toISOString(), model: M, device: deviceRecord(), image: { w: AB.img.width, h: AB.img.height }, count: X.boxes.length,
+        confirmed: X.rows.filter((r) => r.title).length, msDetect: Math.round(X.tDet), msTotal: Math.round(X.tAll), ocrCalls: X.calls, books });
+    } catch (_) {}
+  }
+
+  // 한 구성으로 사진 처리. p0~p1: 진행 팝업에서 이 구성이 차지하는 구간
+  async function processModel(img, M, p0, p1) {
+    const C = CONFIGS[M], span = p1 - p0;
+    if (C.rec === "pp5") { setProgress(p0, `${C.label}: 인식 모델 불러오는 중`); await ensurePP(); }
+    const reader = C.rec === "pp5" ? ppRun : runRec;
+    setProgress(p0, `${C.label}: 책등 찾는 중`);
+    const run = async (key, S) => { const { s } = await session(key); const meta = detInput(img, S); const o = await s.run({ images: meta.t }); return { boxes: decode(o[s.outputNames[0]], meta), r: meta.r }; };
+    const t0 = performance.now();
+    const a = await run(C.det, C.size);
+    const widths = a.boxes.map((b) => Math.min(b.w, b.h) * a.r * 640 / C.size).sort((x, y) => x - y);
+    const medW = widths.length ? widths[Math.floor(widths.length / 2)] : 0;
+    let used = a, mode = String(C.size);
+    if (C.adaptive && widths.length && medW < 22) { used = await run("det1280_int8", 1280); mode = "640 → 1280 (원거리)"; }
+    const tDet = performance.now() - t0;
+    const boxes = used.boxes.sort((x, y) => x.cx - y.cx), rows = []; let calls = 0;
+    for (let i = 0; i < boxes.length; i++) {
+      setProgress(p0 + span * (0.1 + 0.9 * i / Math.max(1, boxes.length)), `${C.label}: 제목 읽는 중 ${i + 1}/${boxes.length}`);
+      const t1 = performance.now();
+      const r = await SP.readSpine(SP.cropUpright(img, boxes[i], mk), mk, reader, matcher, C.opts);
+      r.ms = performance.now() - t1; rows.push(r); calls += r.calls;
+    }
+    setProgress(p1, `${C.label}: 완료`);
+    return { boxes, rows, mode, medW, tDet, tAll: performance.now() - t0, calls };
+  }
+
+  let busy = false;
+  async function recognize(src) {
+    if (busy) return; busy = true;
+    let wake = null; try { wake = await navigator.wakeLock?.request("screen"); } catch (_) {}
+    showProgress("책들을 인식 중입니다.\n잠시만 기다려주세요.");
+    try {
+      // 큰 휴대폰 사진은 긴 변 1600px로 줄여 처리 (원본 해상도 크롭은 정확도 이득이 없음을 실험으로 확인)
+      const iw = src.naturalWidth || src.width, ih = src.naturalHeight || src.height, k = Math.min(1, 1600 / Math.max(iw, ih));
+      const img = mk(Math.round(iw * k), Math.round(ih * k)); img.getContext("2d").drawImage(src, 0, 0, img.width, img.height);
+      AB.img = img;
+      AB.filter = "all";
+      AB.E = await computeE(img, 0, 1);
+      $("abWrap").hidden = false; $("cv").hidden = false; AB.eView = 3; renderModel("E");
+      $("dst").hidden = true;
+      saveRun("E");
+    } catch (e) { logError($("pmStep").textContent, e); $("dst").hidden = false; $("dst").textContent = `인식 실패 [${$("pmStep").textContent}] ${e && e.message ? e.message : e} · 아래 실행 로그를 확인해 주세요`; }
+    finally { hideProgress(); try { await wake?.release(); } catch (_) {} busy = false; $("abWrap").scrollIntoView({ block: "start", behavior: "smooth" }); }
+  }
+  for (const id of ["cam", "lib"]) $(id).addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0]; if (!f || busy) { e.target.value = ""; return; }
+    // 다시 첨부해도 매번 이전 결과를 지우고 같은 진행 팝업으로 시작
+    reset1(); showProgress("책들을 인식 중입니다.\n잠시만 기다려주세요."); setProgress(0, "사진 불러오는 중");
+    const url = URL.createObjectURL(f);
+    try { const img = await loadImg(url); await recognize(img); }
+    catch (err) { logError("사진 불러오기", err); hideProgress(); $("dst").hidden = false; $("dst").textContent = "사진을 불러오지 못했습니다: " + (err && err.message ? err.message : "형식을 확인해 주세요"); }
+    finally { URL.revokeObjectURL(url); e.target.value = ""; }
+  });
+  function reset1() {
+    if (busy) return;
+    AB.A = AB.B = AB.D = AB.E = AB.img = null; AB.view = "E"; AB.eView = 3;
+    for (const [j, w] of [["ev1", 1], ["ev2", 2], ["ev3", 3]]) { $(j).classList.toggle("on", w === 3); $(j).setAttribute("aria-selected", String(w === 3)); }
+    $("eViews").hidden = true; $("cvCap").hidden = true; $("cvLeg").hidden = true;
+    $("abWrap").hidden = true; $("cv").hidden = true; $("res").hidden = true; $("rList").innerHTML = ""; $("cmp").innerHTML = ""; $("dst").hidden = false;
+    $("dst").textContent = "사진을 넣으면 최종모델(E)로 인식합니다. 다른 모델 탭을 누르면 같은 사진을 그 모델로 인식해 비교합니다.";
+  }
+  $("reset1").addEventListener("click", reset1);
+  $("reset2").addEventListener("click", () => {
+    if ($("run").disabled && !$("pm").hidden) return;
+    for (const k of Object.keys(results)) delete results[k];
+    $("tb").innerHTML = '<tr><td colspan="6" style="color:var(--sub)">측정 시작을 누르면 모델별 처리 시간과 A·B 모델의 실제 처리 과정을 측정합니다. 약 2~3분 걸립니다.</td></tr>';
+    $("est").hidden = true; $("chartWrap").hidden = true; $("chart").innerHTML = ""; $("saved").textContent = ""; $("copy").disabled = true;
+    document.querySelectorAll("#st ~ textarea").forEach((t) => t.remove());
+    $("st").textContent = "준비됐습니다. 측정 시작을 누르세요.";
+  });
+
+  init();
+})();
+</script>
+
+</body></html>

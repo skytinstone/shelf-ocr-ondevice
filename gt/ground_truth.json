@@ -1,0 +1,75 @@
+{
+ "_설명": "count = 사진 속 실제 권수(글자 없는 제본 포함), titles = 제목이 보이는 책의 정답 제목(카탈로그 표기와 똑같이). 모르면 null/빈 목록으로 두면 정확도 대신 결과만 출력합니다.",
+ "01_정돈된_책장/minumsa_world_lit.jpg": {
+  "count": 22,
+  "titles": [
+   "햄릿",
+   "햄릿",
+   "햄릿",
+   "변신·시골의사",
+   "변신·시골의사",
+   "동물농장",
+   "동물농장",
+   "허클베리 핀의 모험",
+   "인간의 굴레에서 1",
+   "고리오 영감",
+   "파리대왕",
+   "파리대왕",
+   "파우스트 1",
+   "파우스트 1",
+   "파우스트 2",
+   "젊은 베르테르의 슬픔",
+   "젊은 베르테르의 슬픔",
+   "다섯째 아이",
+   "농담",
+   "야성의 부름",
+   "백년의 고독 1",
+   "백년의 고독 1"
+  ]
+ },
+ "02_비슷한_제목/gongjo_license.jpg": {
+  "count": null,
+  "titles": []
+ },
+ "02_비슷한_제목/dictionaries.jpg": {
+  "count": null,
+  "titles": []
+ },
+ "03_생활_책장/home_campbell.jpg": {
+  "count": 24,
+  "titles": [
+   "캠벨 생명과학",
+   "Critical Review",
+   "Critical Point",
+   "Compact Subnote",
+   "인천국제공항공사 NCS+전공",
+   "한국가스공사 실전모의고사",
+   "Optimization of Nanostructured Lipid Carrier for Enhanced Retinol Delivery",
+   "Deep Learning",
+   "Embedded Recipes",
+   "회사생활에도 예절이 필요합니다"
+  ]
+ },
+ "03_생활_책장/home_kreyszig.jpg": {
+  "count": 17,
+  "titles": [
+   "공업수학 상",
+   "전자기학",
+   "Ulaby의 전자기학",
+   "디지털 논리와 컴퓨터 설계",
+   "현대물리학",
+   "논리설계기초",
+   "컴퓨터 아키텍처",
+   "파이썬 Express",
+   "마이크로컨트롤러 AVR ATmega128",
+   "디지털 신호 처리",
+   "자동제어",
+   "공업수학 하",
+   "회로이론"
+  ]
+ },
+ "04_영어_원서/english_fiction.jpg": {
+  "count": null,
+  "titles": []
+ }
+}

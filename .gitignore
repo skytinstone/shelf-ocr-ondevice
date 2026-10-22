@@ -1,0 +1,13 @@
+# 가상환경 (requirements.txt 로 다시 만듦)
+.venv/
+ocr/
+# 캐시 · 임시
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
+runs/
+outputs/train/*/weights/last.pt
+
+# 보고서 초안·정리 문서: 사전과제 내용 공개 금지 조건 때문에 공개 저장소에서 제외
+docs/

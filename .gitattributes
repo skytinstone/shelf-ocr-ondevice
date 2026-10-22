@@ -1,0 +1,4 @@
+# 50MB가 넘는 파일과 모델 가중치는 Git LFS (web/ 폴더는 GitHub Pages가 LFS를 제공하지 않으므로 일반 파일로 둠)
+*.pt filter=lfs diff=lfs merge=lfs -text
+shelf_ocr_test.ipynb filter=lfs diff=lfs merge=lfs -text
+shelf_ocr_test_rev.ipynb filter=lfs diff=lfs merge=lfs -text

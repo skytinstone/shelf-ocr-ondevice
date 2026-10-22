@@ -1,0 +1,27 @@
+# Python 3.11 / macOS Apple Silicon(M3 Pro, CPU)에서 노트북 전체 실행 확인한 버전
+numpy==2.3.5
+pandas==3.0.6
+matplotlib==3.11.2
+opencv-python==5.0.0.93
+rapidfuzz==3.14.6
+
+# 책등 검출 (YOLO11n-OBB)
+torch==2.14.1
+ultralytics==8.4.183
+
+# B 엔진
+easyocr==1.7.2
+
+# C·D 엔진 (설치가 안 되면 이 두 줄만 빼고 B만 테스트해도 됩니다)
+paddlepaddle==3.3.1
+paddleocr==3.7.0
+
+# Jupyter / VS Code 노트북 커널
+ipykernel==7.4.0
+
+# 2-1번 사진 업로드 셀 (업로드 위젯, 아이폰 HEIC 변환)
+ipywidgets==8.1.9
+pillow-heif==1.8.1
+
+# 평가 결과 표 (eval/run_book_test.py)
+tabulate==0.10.0

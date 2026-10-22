@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>On-Device 책 권수·제목 추출 데모</title>
+<script>
+function isMobileOrTablet() {
+  /* 터치 기기 + 모바일/태블릿 UA(iPadOS 포함) + 화면 긴 변 1400px 이하만 허용 (브라우저 쪽 판별: 보안 장치가 아니라 사용 환경 제한) */
+  var ua = navigator.userAgent || "", tp = navigator.maxTouchPoints || 0;
+  var touch = tp > 0 || "ontouchstart" in window;
+  var coarse = !!(window.matchMedia && matchMedia("(pointer: coarse)").matches);
+  var mobileUA = /Android|iPhone|iPad|iPod|Mobile|Tablet|Silk|Kindle/i.test(ua) || (/Macintosh/.test(ua) && tp > 1);
+  var longSide = Math.max(screen.width, screen.height), shortSide = Math.min(screen.width, screen.height);
+  return touch && coarse && mobileUA && longSide <= 1400 && shortSide <= 1100;
+}
+if (isMobileOrTablet()) location.replace("app.html");
+</script>
+<style>
+:root { --bg: #f3f5f7; --panel: #ffffff; --ink: #17202b; --sub: #5d6876; --line: #d8dee6; --acc: #0f5f73; }
+body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg);
+  font-family: "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif; color: var(--ink); }
+.c { max-width: 520px; margin: 24px 16px; padding: 32px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
+h1 { font-size: 20px; margin: 0 0 12px; color: var(--acc); }
+p { line-height: 1.6; color: var(--sub); margin: 8px 0; }
+code { background: #eef2f6; padding: 2px 6px; border-radius: 4px; word-break: break-all; }
+small { color: var(--sub); }
+</style>
+</head>
+<body>
+<div class="c">
+  <h1>휴대폰 · 태블릿에서 열어 주세요</h1>
+  <p>이 데모는 On-Device(스마트폰·태블릿) 환경에서 책장 사진의 권수와 제목을 인식하는 시스템입니다. PC에서는 실행되지 않도록 막아 두었습니다.</p>
+  <p>휴대폰이나 태블릿의 브라우저에서 아래 주소를 열어 주세요.</p>
+  <p><code id="u"></code></p>
+  <p><small>사전과제 데모 · 비공식 · 사진은 서버로 전송하거나 저장하지 않습니다.</small></p>
+</div>
+<script>document.getElementById("u").textContent = location.href.replace(/[^/]*$/, "");</script>
+</body>
+</html>

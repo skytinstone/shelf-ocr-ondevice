@@ -1,0 +1,189 @@
+# 제목이 아닌 글자 (저자 · 출판사 · 시리즈명). 카탈로그 확정에 실패했을 때, 읽은 글자가 이것과 같거나 비슷하면 제목으로 보여 주지 않음
+# 실제 서비스에서는 도서 DB의 저자·출판사 필드로 자동 생성
+# 시리즈 · 문구
+세계문학전집
+세계 문학 전집
+민음사 세계문학전집
+베스트셀러
+최신판
+개정판
+전면개정판
+NEW YORK TIMES BESTSELLER
+INTERNATIONAL BESTSELLER
+# 출판사
+민음사
+문학동네
+창비
+열린책들
+김영사
+위즈덤하우스
+웅진지식하우스
+다산북스
+쌤앤파커스
+알에이치코리아
+은행나무
+한빛미디어
+한빛아카데미
+생능출판
+교보문고
+텍스트북스
+에듀윌
+시대에듀
+해커스
+박문각
+나두공
+시스컴
+한솔아카데미
+구민사
+동아출판
+민중서림
+교학사
+WILEY
+McGraw Hill
+PEARSON
+Penguin
+HarperCollins
+Vintage
+# 저자 (세계문학전집)
+윌리엄 셰익스피어
+셰익스피어
+프란츠 카프카
+카프카
+조지 오웰
+마크 트웨인
+서머싯 몸
+오노레 드 발자크
+발자크
+윌리엄 골딩
+요한 볼프강 폰 괴테
+괴테
+도리스 레싱
+밀란 쿤데라
+잭 런던
+가브리엘 가르시아 마르케스
+헤르만 헤세
+알베르 카뮈
+표도르 도스토옙스키
+도스토옙스키
+F. 스콧 피츠제럴드
+올더스 헉슬리
+J.D. 샐린저
+다자이 오사무
+무라카미 하루키
+히가시노 게이고
+생텍쥐페리
+파울로 코엘료
+# 저자 (국내·교양)
+한강
+김호연
+이미예
+손원평
+조남주
+김난도
+자청
+세이노
+요한 하리
+유발 하라리
+재레드 다이아몬드
+칼 세이건
+리처드 도킨스
+마이클 샌델
+기시미 이치로
+제임스 클리어
+김승호
+엠제이 드마코
+이민진
+윤정은
+최진영
+양귀자
+조창인
+신경숙
+김훈
+박경리
+조정래
+김영하
+구병모
+정세랑
+김초엽
+대니얼 카너먼
+리처드 탈러
+한스 로슬링
+게리 켈러
+앤절라 더크워스
+강용수
+김수현
+백세희
+하완
+이기주
+정유정
+황보름
+루리
+정해연
+클레어 키건
+룰루 밀러
+앤디 위어
+류츠신
+프랭크 허버트
+아이작 아시모프
+로버트 C. 마틴
+사이토 고키
+남궁성
+박응용
+# 저자 (전공서)
+Kreyszig
+Hayt
+Buck
+Ulaby
+Mano
+Kime
+Beiser
+Roth
+Kinney
+Kuo
+Golnaraghi
+Irwin
+Nelms
+Campbell
+Ian Goodfellow
+Yoshua Bengio
+Aaron Courville
+# 추가 (샘플 9장 저자·출판사)
+나두공수험연구소
+시대에듀
+김성곤
+동일출판사
+김상현
+시원스쿨
+시원스쿨LAB
+합격의 공식
+Liv Constantine
+Michael Crichton
+Michael Connelly
+Laura Dave
+Hernan Diaz
+Ashley Elston
+Percival Everett
+Alison Espach
+Lucy Foley
+Carley Fortune
+John Grisham
+Lauren Groff
+Sarah Bakewell
+Malcolm Gladwell
+Tara Westover
+Anna Lembke
+Josh Kaufman
+Priya Parker
+Scott Galloway
+Steven Bartlett
+Peter Lynch
+Howard Marks
+Evy Poumpouras
+Seth Godin
+Mel Robbins
+Riverhead Books
+Little Brown
+Ballantine Books
+Phoenix
+Berkley
+Headline
