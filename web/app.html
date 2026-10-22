@@ -73,6 +73,10 @@ canvas { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--
 .tabs4 { grid-template-columns: repeat(2, 1fr); }
 .tabs4 .tab { font-size: .86rem; padding: 9px 4px; }
 .tabs4 .tab:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+.tabs4 .tab.beta { grid-column: 1 / -1; border-top: 1px solid var(--line); }
+.spec .st { display: inline-block; font-size: .7rem; font-weight: 700; border-radius: 4px; padding: 0 5px; margin-right: 6px; }
+.spec .st.ok { background: #e3f4ea; color: #1f7a4d; } .spec .st.todo { background: #fff4dc; color: #9a6700; } .spec .st.hard { background: #fde8e8; color: #b42318; }
+.spec .note2 { grid-column: 1 / -1; margin-top: 6px; color: var(--sub); line-height: 1.5; }
 .eviews .tab { font-size: .8rem; }
 .cvcap { font-size: .8rem; color: var(--sub); margin: 6px 0 0; }
 .blist .kind { font-size: .72rem; color: var(--sub); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; margin-left: 6px; font-weight: 500; white-space: nowrap; }
@@ -188,6 +192,7 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
         <button type="button" role="tab" id="tabB" class="tab" aria-selected="false">개선모델(B)</button>
         <button type="button" role="tab" id="tabD" class="tab" aria-selected="false">PaddleOCR(D)</button>
         <button type="button" role="tab" id="tabE" class="tab on" aria-selected="true">최종모델(E)</button>
+        <button type="button" role="tab" id="tabL" class="tab beta" aria-selected="false">Liber(β) · 다음 단계</button>
       </div>
       <dl class="spec" id="spec"></dl>
       <div class="cmp" id="cmp"></div>
@@ -925,7 +930,7 @@ const DEVICES = [
 ].map(([group, name, chip, ram, year, reported]) => ({ group, name, chip, ram, year, reported: !!reported }));
 
 // 앱 버전: 최종 제출 전까지 0.x 유지, 패치마다 0.10 → 0.11 → 0.12 … 로 하나씩 올림
-const APP_VERSION = "0.11", APP_UPDATED = "2026-10-22 20:33 (KST)";
+const APP_VERSION = "0.12", APP_UPDATED = "2026-10-23 00:50 (KST)";
 
 // 최종모델(E) 용량 · 메모리 (MB). 검출기는 직접 학습한 YOLO11n-OBB (책등·표지 2클래스, 40에포크)
 const MODEL_INFO = {
@@ -2398,6 +2403,7 @@ if (typeof module !== "undefined") module.exports = ER;
          desc: "검출기 INT8(3.2MB) + 원거리 촬영 시 1280 재검출 · 조기 종료 · 권차·점수 차·포함 관계 검증 · 글자 없는 책등 판별" },
     D: { label: "PaddleOCR(D)", det: "det640_int8", size: 640, adaptive: true, rec: "pp5", opts: { clahe: false, early: true, verify: true, noText: true, prep: (im) => ppPrep(im) } },
     E: { label: "최종모델(E)" },
+    L: { label: "Liber(β)" },
   };
   // 탭마다 적용된 모델 구성 (인식 후 표시)
   const SPEC = {
@@ -2413,6 +2419,29 @@ if (typeof module !== "undefined") module.exports = ER;
         ["실행 엔진", "ONNX Runtime Web(검출) + rten(PaddleOCR) · WASM"],
         ["PC와 다른 점", "표지 검출 1회(PC 6회) · 글자 방향은 굵은 글자 상자 2개로 판단(PC 6개)"]],
   };
+  // Liber(β): PC 노트북(liber_deprehensus.ipynb)에서 전체 흐름을 검증한 9단계 모델. 휴대폰 이식 준비 상태를 보여 줌
+  const LIBER_ST = { ok: "준비됨", todo: "변환·이식 필요", hard: "검토 필요" };
+  const LIBER_SPEC = [
+    ["① 책 검출", "YOLO11n-OBB (Liber 자체 학습)", "todo", "ONNX 변환 쉬움(INT8 약 3MB) · 정식 학습 후 적용"],
+    ["② 가짜 책 필터", "SAM 2.1 tiny", "hard", "인코더 ONNX 약 40MB(INT8) · 사진당 인코더 1회가 수 초로 예상"],
+    ["③ 권수 확정", "ViT 4종 분류", "todo", "DeiT-Small 약 22MB 가능 · ViT-Large(약 300MB)는 휴대폰에 과함"],
+    ["④ 업스케일", "FSRCNN", "todo", "약 40KB · ONNX 변환만 필요"],
+    ["⑤ 글자 검출", "PP-OCRv5 det", "ok", "최종모델(E)에서 사용 중 (4.9MB)"],
+    ["⑥ 언어·방향", "PP-OCRv5 rec", "ok", "최종모델(E)에서 사용 중 · 세로쓰기 펼침 규칙만 이식"],
+    ["⑦ ROI 정렬", "원근 변환 + CLAHE", "todo", "학습 없는 계산 · JS로 구현"],
+    ["⑧ 글자 인식", "TrOCR 한국어·영어", "hard", "각 약 60MB(INT8) · 글자 생성 반복을 JS로 구현 · 제목 줄만 읽도록 순서 변경 필요"],
+    ["⑨ 제목 확정", "규칙 + 글자 5-gram + 카탈로그", "todo", "학습 없는 계산 · 카탈로그 매칭은 E에 이미 있음"],
+  ];
+  function renderLiber() {
+    AB.view = "L";
+    for (const k of ["A", "B", "D", "E", "L"]) { const t = $("tab" + k); t.classList.toggle("on", k === "L"); t.setAttribute("aria-selected", String(k === "L")); }
+    for (const id of ["cv", "cvCap", "cvLeg", "eViews", "res"]) $(id).hidden = true;
+    $("cmp").innerHTML = "";
+    $("spec").innerHTML = `<dt class="h">Liber(β) · 모델 아키텍처와 9단계 휴대폰 이식 상태</dt>` +
+      LIBER_SPEC.map(([b, m, st, note]) => `<dt>${b}</dt><dd><span class="st ${st}">${LIBER_ST[st]}</span>${m}<br><small>${note}</small></dd>`).join("") +
+      `<dd class="note2"><img src="liber_arch.png" alt="Liber 모델 아키텍처" style="display:block;width:100%;max-width:560px;margin:4px auto 8px;border:1px solid var(--line);border-radius:8px;background:#fff"></dd>` +
+      `<dd class="note2">Liber는 PC에서 사진 → 권수 → 제목까지 전체 흐름 검증을 마친 베타입니다. 휴대폰에는 단계별로 옮기는 중이라, 지금은 이 사진을 Liber로 인식하지 않습니다. 인식 결과는 최종모델(E) 탭에서 볼 수 있습니다.</dd>`;
+  }
   const AB = { A: null, B: null, D: null, E: null, img: null, view: "E", eView: 3 };
   // ---- PaddleOCR PP-OCRv5 한국어 인식기 (rten WASM) ----
   let PP = null, rtenReady = false;
@@ -2568,7 +2597,8 @@ if (typeof module !== "undefined") module.exports = ER;
   function renderModel(M) {
     const R = AB[M]; if (!R) return;
     AB.view = M;
-    for (const k of ["A", "B", "D", "E"]) { const t = $("tab" + k); t.classList.toggle("on", k === M); t.setAttribute("aria-selected", String(k === M)); }
+    for (const k of ["A", "B", "D", "E", "L"]) { const t = $("tab" + k); t.classList.toggle("on", k === M); t.setAttribute("aria-selected", String(k === M)); }
+    $("cv").hidden = false;
     $("spec").innerHTML = `<dt class="h">${CONFIGS[M].label} 적용 모델</dt>` + SPEC[M].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
     const f = AB.filter || "all";
     redraw(); renderList(R.rows, f); $("res").hidden = false;
@@ -2584,6 +2614,7 @@ if (typeof module !== "undefined") module.exports = ER;
   // 탭을 처음 누르면 같은 사진을 그 모델로 인식
   async function openModel(M) {
     if (!AB.img || busy) return;
+    if (M === "L") { renderLiber(); return; }
     if (!AB[M]) {
       busy = true; let wake = null; try { wake = await navigator.wakeLock?.request("screen"); } catch (_) {}
       showProgress(`${CONFIGS[M].label}로 인식 중입니다.\n잠시만 기다려주세요.`);
@@ -2593,7 +2624,7 @@ if (typeof module !== "undefined") module.exports = ER;
     }
     renderModel(M);
   }
-  for (const M of ["A", "B", "D", "E"]) $("tab" + M).addEventListener("click", () => openModel(M));
+  for (const M of ["A", "B", "D", "E", "L"]) $("tab" + M).addEventListener("click", () => openModel(M));
   async function saveRun(M) {
     try {
       const db = await claude.use("db"); if (!db) return; const X = AB[M];
