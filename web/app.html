@@ -131,6 +131,15 @@ canvas { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--
 .dev div { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }
 .dev small { display: block; color: var(--sub); font-size: .76rem; }
 .dev b { font-size: 1.02rem; overflow-wrap: anywhere; }
+.ver { margin: 2px 0 0; font-family: var(--f-mono); font-size: .76rem; color: var(--sub); }
+.mspec { margin: 12px 0 10px; }
+.fit { margin: 10px 0 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: .84rem; display: grid; gap: 6px; }
+.fit.pass { border-color: var(--ok); } .fit.fail { border-color: var(--bad); } .fit.unk { border-color: var(--warn); }
+.fit b { font-size: .92rem; } .fit.pass b { color: var(--ok); } .fit.fail b { color: var(--bad); } .fit.unk b { color: var(--warn); }
+.fit .meter { height: 8px; border-radius: 99px; background: #d9dde3; overflow: hidden; }
+.fit .meter i { display: block; height: 100%; border-radius: 99px; background: var(--ok); }
+.fit.fail .meter i { background: var(--bad); }
+.fit small { color: var(--sub); font-size: .76rem; }
 select { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; width: 100%; max-width: 100%; min-width: 0; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -139,6 +148,7 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
   <header>
     <h1><small class="brand">사전과제 데모 · 비공식</small><span>On-Device 책 권수/제목 추출 시스템</span></h1>
     <p class="who">AI 엔지니어 사전과제 · 지원자 신민석</p>
+    <p class="ver" id="appVer"></p>
     <p class="lede">On-Device 환경에서 책장 이미지를 업로드하여, 책장에 꽂혀 있는 책들의 권 수와 책 제목들을 인식할 수 있는 시스템을 구성하였습니다.<br>※ 사진은 서버로 전송하거나 저장되지 않습니다.</p>
   </header>
 
@@ -157,12 +167,15 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
       <div><small>칩셋 · RAM</small><b id="dSpec">선택 전</b></div>
     </div>
     <p class="warn" id="dWarn" hidden></p>
+    <dl class="spec mspec" id="mSpec"></dl>
+    <button type="button" id="fitBtn" disabled>모델 · 기기 RAM 적합성 판단</button>
+    <div class="fit" id="fitRes" hidden></div>
     <p class="rtline"><span class="dot" id="rtdot"></span>런타임 ONNX Runtime Web · <span id="rtstate">준비 중</span></p>
   </section>
 
   <section class="step locked" id="sec2">
     <h2>2. 책 제목 및 권수 추출 시스템</h2>
-    <p class="lockmsg">먼저 1. 기기 선택을 완료해 주세요.</p>
+    <p class="lockmsg">먼저 1. 기기 선택 후 RAM 적합성 판단을 완료해 주세요.</p>
     <div class="row">
       <label class="file-btn">사진 찍기<input id="cam" type="file" accept="image/*" capture="environment"></label>
       <label class="file-btn ghost">보관함에서 선택<input id="lib" type="file" accept="image/*"></label>
@@ -211,7 +224,7 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
 
   <section class="step locked" id="sec3" hidden>
     <h2>3. 처리 시간 측정</h2>
-    <p class="lockmsg">먼저 1. 기기 선택을 완료해 주세요.</p>
+    <p class="lockmsg">먼저 1. 기기 선택 후 RAM 적합성 판단을 완료해 주세요.</p>
     <div class="row">
       <button id="run" type="button" disabled>측정 시작</button>
       <button id="copy" type="button" class="ghost" disabled>결과 복사</button>
@@ -911,6 +924,21 @@ const DEVICES = [
   ["기타", "기타 Android 태블릿", "-", "-", 0],
 ].map(([group, name, chip, ram, year, reported]) => ({ group, name, chip, ram, year, reported: !!reported }));
 
+// 앱 버전: 최종 제출 전까지 0.x 유지, 패치마다 0.10 → 0.11 → 0.12 … 로 하나씩 올림
+const APP_VERSION = "0.10", APP_UPDATED = "2026-10-22 17:25 (KST)";
+
+// 최종모델(E) 용량 · 메모리 (MB). 검출기는 직접 학습한 YOLO11n-OBB (책등·표지 2클래스, 40에포크)
+const MODEL_INFO = {
+  trainedPt: 5.66,        // models/books_obb_best.pt
+  unified: 10.96,         // web/e_unified.onnx (FP32, 입력 960)
+  others: 26.34,          // 글자 검출 4.87 + 영어 인식 7.93 + 한국어 인식 13.50
+  runtime: 13.79,         // ONNX Runtime WASM 11.25 + rten WASM 2.54
+  unifiedPeak: 223,       // e_unified.onnx 960 입력 1스레드 실행 시 최대 메모리 실측
+  imageBuf: 96,           // 12MP 사진 RGBA 48MB × 원본·작업용 2장
+};
+MODEL_INFO.peak = Math.round(MODEL_INFO.unifiedPeak + MODEL_INFO.others * 3 + MODEL_INFO.runtime + MODEL_INFO.imageBuf);   // 나머지 모델은 가중치의 3배(사본·작업 메모리)로 잡음
+const RAM_BUDGET = 0.25;  // 브라우저 탭 하나가 안정적으로 쓸 수 있는 메모리 = 기기 RAM의 25% (OS·다른 앱 몫을 뺀 보수적 기준)
+
 // ===== 책장 인식 파이프라인 (기기 내 실행) =====
 // 서버 파이썬 구현(src/segment.py, ocr.py, matcher.py, pipeline.py)을 그대로 옮긴 것.
 // 환경 독립: 캔버스 생성 함수 mk(w, h)를 주입받아 브라우저와 노드에서 같은 코드로 동작.
@@ -1260,7 +1288,7 @@ const EP = (() => {
     return { crop: cv, tf };
   }
   function cropBook(img, bk) {
-    if (bk.kind === "spine") return cropUpright(img, bk);
+    if (bk.kind === "spine" || bk.obb) return cropUpright(img, bk);
     let [x1, y1, x2, y2] = bk.bbox.map(Math.round); x1 = Math.max(0, x1); y1 = Math.max(0, y1); x2 = Math.min(img.width, x2); y2 = Math.min(img.height, y2);
     return { crop: cropRect(img, x1, y1, x2, y2), tf: ([u, v]) => [u + x1, v + y1] };
   }
@@ -1463,8 +1491,25 @@ const EP = (() => {
     return { cands, coco: fused.filter((c) => c.support >= 0.03).map((c) => c.bbox), fused };
   }
 
+  // Step 1 (통합 검출기): 모든 방향의 책등·표지를 YOLO11n-OBB 한 번으로 검출 → 스프링 노트 판정 → 읽는 순서
+  const UCFG = { imgsz: 960, conf: 0.35, iou: 0.5 };
+  async function detectBooksUnified(img, rt) {
+    const books = [];
+    for (const b of await rt.unified(img, UCFG)) {
+      const poly = boxPoly(b), bk = { ...b, obb: true, poly, bbox: bboxOf(poly), short: Math.min(b.w, b.h) };
+      if (bk.kind === "spine") {
+        await breathe();
+        const { crop } = cropUpright(img, bk);
+        bk.spiral = spiralScore(crop) >= 0.2 && (await rt.textDet(crop)).length <= 1;
+      }
+      books.push(bk);
+    }
+    return { books: orderBooks(books), stages: { fused: [], candidates: [], coverScene: false, unified: true } };
+  }
+
   // Step 1 전체: 책등 + 표지 후보 → 정리 → 글자 방향 검사 → 병합
   async function detectBooks(img, rt) {
+    if (rt.unified) return detectBooksUnified(img, rt);
     let spines = (await rt.spine(img, CFG.spine)).filter((s) => Math.max(s.w, s.h) / Math.max(1e-6, Math.min(s.w, s.h)) >= CFG.spine.minAspect);
     spines = spines.map((s) => { const poly = boxPoly(s); return { ...s, kind: "spine", poly, bbox: bboxOf(poly), short: Math.min(s.w, s.h) }; });
     const { cands: cands0, coco, fused } = await coverCandidates(img, spines, rt);
@@ -1649,7 +1694,7 @@ if (typeof module !== "undefined") module.exports = EP;
 // ultralytics / PaddleOCR 전·후처리를 그대로 옮김 (letterbox, NMS, DB 후처리, CTC 디코딩)
 const ER = (() => {
   const EPX = typeof EP !== "undefined" ? EP : require("./e_pipeline.js");
-  function make({ ort, mk, spineSess, coverSess, det, ko, en }) {
+  function make({ ort, mk, spineSess, coverSess, unifiedSess, det, ko, en }) {
     // det/ko/en: { run(shapeU32, Float32Array) -> {data, shape} } , ko/en 은 dict 포함
     const getData = (cv) => cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data;
 
@@ -1687,6 +1732,21 @@ const ER = (() => {
       const keep = [];
       for (let i = 0; i < bs.length && keep.length < 300; i++) { let ok = true; for (let j = 0; j < i; j++) if (probiou(bs[j], bs[i]) >= cfg.iou) { ok = false; break; } if (ok) keep.push(bs[i]); }
       return keep.map((b) => ({ cx: (b.cx - m.px) / m.r, cy: (b.cy - m.py) / m.r, w: b.w / m.r, h: b.h / m.r, ang: b.ang, score: b.score }));
+    }
+
+    // ---- 통합 검출기 (책등·표지 2클래스 YOLO11n-OBB): 출력 [1, 4+2+1, N] = cx, cy, w, h, 책등 점수, 표지 점수, 각도
+    async function unified(img, cfg) {
+      const m = letterbox(img, cfg.imgsz, false), o = await unifiedSess.run({ images: m.t }), out = o[unifiedSess.outputNames[0]];
+      const N = out.dims[2], NC = out.dims[1] - 5, a = out.data, bs = [];
+      for (let i = 0; i < N; i++) {
+        let bi = 0, bv = -1; for (let c = 0; c < NC; c++) { const v = a[(4 + c) * N + i]; if (v > bv) { bv = v; bi = c; } }
+        if (bv < cfg.conf) continue;
+        bs.push({ cx: a[i], cy: a[N + i], w: a[2 * N + i], h: a[3 * N + i], ang: a[(4 + NC) * N + i], score: bv, cls: bi });
+      }
+      bs.sort((x, y) => y.score - x.score);
+      const keep = [];   // 클래스별 회전 NMS (ultralytics 기본: agnostic=False)
+      for (let i = 0; i < bs.length && keep.length < 300; i++) { let ok = true; for (const k of keep) if (k.cls === bs[i].cls && probiou(k, bs[i]) >= cfg.iou) { ok = false; break; } if (ok) keep.push(bs[i]); }
+      return keep.map((b) => ({ cx: (b.cx - m.px) / m.r, cy: (b.cy - m.py) / m.r, w: b.w / m.r, h: b.h / m.r, ang: b.ang, score: b.score, kind: b.cls === 1 ? "cover" : "spine" }));
     }
 
     // ---- 표지 후보: COCO 'book'(73)이 최고 클래스인 상자만, NMS IoU 0.7 (ultralytics 기본)
@@ -1790,7 +1850,7 @@ const ER = (() => {
     const recMany = async (model, cvs) => { const out = []; for (const c of cvs) { out.push(recOne(model, c)); await new Promise((r) => setTimeout(r, 0)); } return out; };
     const recKo = (cvs) => recMany(ko, cvs);
     const recEn = (cvs) => recMany(en, cvs);
-    return Object.assign(api, { spine, cover, textDet, recKo, recEn });
+    return Object.assign(api, { spine, cover, textDet, recKo, recEn }, unifiedSess ? { unified } : {});
   }
   return { make };
 })();
@@ -1839,9 +1899,45 @@ if (typeof module !== "undefined") module.exports = ER;
     return { os, type, foldable: /폴더블/.test(type) };
   }
   function setLocked(on) { for (const id of ["sec2", "sec3"]) $(id).classList.toggle("locked", on); }
+  const mb = (v) => v >= 1000 ? (v / 1024).toFixed(1) + "GB" : Math.round(v) + "MB";
+  $("appVer").textContent = `v${APP_VERSION} · 마지막 업데이트 ${APP_UPDATED}`;
+  $("mSpec").innerHTML = `<dt class="h">최종모델(E) 용량</dt>` +
+    `<dt>학습한 검출기</dt><dd>YOLO11n-OBB 책등·표지 · ${MODEL_INFO.trainedPt.toFixed(1)}MB (PyTorch) · ${MODEL_INFO.unified.toFixed(1)}MB (웹용 ONNX)</dd>` +
+    `<dt>글자 검출·인식</dt><dd>${MODEL_INFO.others.toFixed(1)}MB</dd>` +
+    `<dt>모델 합계</dt><dd>${(MODEL_INFO.unified + MODEL_INFO.others).toFixed(1)}MB</dd>` +
+    `<dt>실행 시 메모리</dt><dd>최대 약 ${MODEL_INFO.peak}MB (예상)</dd>`;
+  // 사양표 RAM 문자열에서 가장 작은 용량(GB) → 없으면 브라우저가 알려 주는 값(Android Chrome, 최대 8GB로 표시)
+  function ramOf(d) {
+    const n = d ? (d.ram.match(/\d+(?=\s*GB)/g) || []).map(Number) : [];
+    if (n.length) return { gb: Math.min(...n), src: "사양표" };
+    if (navigator.deviceMemory) return { gb: navigator.deviceMemory, src: "브라우저 보고값" };
+    return null;
+  }
+  function checkFit() {
+    const d = DEVICES.find((x) => x.name === $("dPick").value); if (!d) return;
+    const r = ramOf(d), el = $("fitRes"), need = MODEL_INFO.peak;
+    el.hidden = false;
+    if (!r) {
+      el.className = "fit unk";
+      el.innerHTML = `<b>RAM 정보가 없어 판단할 수 없습니다</b><small>필요 메모리 약 ${need}MB · 실행 중 브라우저가 멈추면 다른 앱을 닫고 다시 시도해 주세요. 다음 단계는 진행할 수 있습니다.</small>`;
+      setLocked(false); return;
+    }
+    const allow = r.gb * 1024 * RAM_BUDGET, ok = need <= allow, pct = Math.min(100, (need / allow) * 100);
+    el.className = "fit " + (ok ? "pass" : "fail");
+    el.innerHTML = `<b>${ok ? "적합: 허용 메모리 안에 들어갑니다" : "부적합: 허용 메모리를 넘습니다"}</b>` +
+      `<div class="meter"><i style="width:${pct.toFixed(0)}%"></i></div>` +
+      `<span>필요 약 ${need}MB / 허용 ${mb(allow)} (RAM ${r.gb}GB × ${RAM_BUDGET * 100}%, ${r.src}) · 사용률 ${((need / allow) * 100).toFixed(0)}%</span>` +
+      `<small>${ok ? "다음 단계로 진행합니다." : "이 기기에서는 실행 중 브라우저가 종료될 수 있어 다음 단계를 잠가 두었습니다."}</small>`;
+    setLocked(!ok);
+    if (ok) $("sec2").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  $("fitBtn").addEventListener("click", checkFit);
+  let pickedDev;
   function applyPick() {
     const d = DEVICES.find((x) => x.name === $("dPick").value), P = pickedInfo(d);
     const set = (id, v) => { const el = $(id); el.textContent = v || "선택 전"; el.classList.toggle("empty", !v); };
+    if (d !== pickedDev) { pickedDev = d; $("fitRes").hidden = true; setLocked(true); }   // 기기가 바뀌면 적합성 판단을 다시 받음 (화면 회전 등 재감지는 유지)
+    $("fitBtn").disabled = !P;
     if (!P) { ["dOs", "dType", "dModel", "dSpec"].forEach((id) => set(id, "")); $("dWarn").hidden = true; setLocked(true); return; }
     set("dOs", P.os); set("dType", P.type); set("dModel", d.name);
     set("dSpec", d.chip === "-" ? "사양 정보 없음" : `${d.chip} · ${d.ram}${d.reported ? " · 보도 기준" : ""}`);
@@ -1849,7 +1945,6 @@ if (typeof module !== "undefined") module.exports = ER;
     const known = ["iOS", "iPadOS", "Android"].includes(device.os);
     $("dWarn").hidden = !(known && device.os !== P.os);
     $("dWarn").textContent = `선택한 기기(${P.os})와 이 기기에서 감지된 운영체제(${device.os})가 다릅니다. 선택을 확인해 주세요.`;
-    setLocked(false);
   }
 
   // 기기 목록 채우기
@@ -2261,17 +2356,23 @@ if (typeof module !== "undefined") module.exports = ER;
     if (ERT) return ERT;
     await ensurePP(); EP.init(mk);
     try { EP.setNonTitles((await (await fetch("non_titles.txt")).text()).split("\n"), SP); } catch (e) { logError("제목 아님 목록", e); }
+    let unifiedSess = null, spineSess = null, coverSess = null;
+    step("통합 책 검출기 확인 중");
+    try { unifiedSess = await ort.InferenceSession.create(await fetchBuf("e_unified.onnx"), { executionProviders: ["wasm"], graphOptimizationLevel: "all" }); }
+    catch (e) { unifiedSess = null; }   // 없으면 기존 방식(책등 모델 + 표지 모델 + 규칙)
+    if (unifiedSess) { logLine("Step 1: 통합 검출기(YOLO11n-OBB 책등·표지, 모든 방향) 사용"); }
+    else {
     step("책등 검출기 불러오는 중");
-    const spineSess = await ort.InferenceSession.create(await fetchB64("e_spine960.onnx.b64.txt"), { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
+    spineSess = await ort.InferenceSession.create(await fetchB64("e_spine960.onnx.b64.txt"), { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
     step("표지 검출기 불러오는 중 (58MB, 처음 한 번)");
-    let coverSess = null;
     try { coverSess = await ort.InferenceSession.create(await fetchParts(["e_cover.part1.b64.txt", "e_cover.part2.b64.txt", "e_cover.part3.b64.txt", "e_cover.part4.b64.txt", "e_cover.part5.b64.txt", "e_cover.part6.b64.txt"]), { executionProviders: ["wasm"], graphOptimizationLevel: "basic" }); }
     catch (e) { coverErr = "표지 검출기를 불러오지 못해 책등만 검출했습니다 (" + (e && e.message ? e.message : e) + ")"; logError("표지 검출기 불러오기", e); }
+    }
     step("글자 검출·영어 인식 모델 불러오는 중");
     const det = rtenModel(await fetchB64("e_det.rten.b64.txt"));
     const en = rtenModel(await fetchB64("e_en_rec.rten.b64.txt"), await fetchDict("e_en_dict.txt"));
     const ko = { run: (shape, data) => { const r = PP.model.run(shape, data); const out = { data: r.data, shape: Array.from(r.shape) }; try { r.free(); } catch (_) {} return out; }, dict: PP.dict };   // D와 같은 한국어 인식기 공유
-    ERT = ER.make({ ort, mk, spineSess, coverSess, det, ko, en });
+    ERT = ER.make({ ort, mk, spineSess, coverSess, unifiedSess, det, ko, en });
     return ERT;
   }
   async function computeE(img, p0, p1) {

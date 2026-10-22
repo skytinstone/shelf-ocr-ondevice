@@ -25,3 +25,8 @@ pillow-heif==1.8.1
 
 # 평가 결과 표 (eval/run_book_test.py)
 tabulate==0.10.0
+
+# 통합 검출기 웹용 변환 (tools/export_unified.py)
+onnx==1.23.2
+onnxruntime==1.31.0
+onnxslim==0.1.98

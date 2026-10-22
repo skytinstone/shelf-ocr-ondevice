@@ -1,12 +1,297 @@
 {
- "IMG_1592.jpg": {
-  "count": 4,
+ "IMG_1587.jpg": {
+  "count": 1,
   "titles": [
-   "서진헌·심형 이상구·유 배현덕·양",
-   "함운철·최형 박제남 공"
+   "Embedded Recipes"
   ],
-  "ms": 19457.789833002607,
-  "ms_det": 14131.19904200721,
+  "books": [
+   {
+    "kind": "cover",
+    "final": "Embedded Recipes",
+    "source": "카탈로그",
+    "raw": "EMBEDDED RECIPES",
+    "view": "정방향 · 제목 2상자 (en)"
+   }
+  ],
+  "ms": 4197.772582992911,
+  "ms_det": 914.0410830004839
+ },
+ "IMG_1588.jpg": {
+  "count": 1,
+  "titles": [
+   "ed Re"
+  ],
+  "books": [
+   {
+    "kind": "spine",
+    "final": "ed Re",
+    "source": "OCR",
+    "raw": "ed Re",
+    "view": "정방향 · 제목 1상자 (en)"
+   }
+  ],
+  "ms": 1322.9634160088608,
+  "ms_det": 143.55500000237953
+ },
+ "IMG_1589.jpg": {
+  "count": 2,
+  "titles": [
+   "안현식·구현철·박종후·이장명 한 한상수·홍상훈공역",
+   "회로이론"
+  ],
+  "books": [
+   {
+    "kind": "spine",
+    "final": "안현식·구현철·박종후·이장명 한 한상수·홍상훈공역",
+    "source": "OCR",
+    "raw": "안현식·구현철·박종후·이장명 한 한상수·홍상훈공역",
+    "view": "시계 90° · 제목 3상자 (ko)"
+   },
+   {
+    "kind": "spine",
+    "final": "회로이론",
+    "source": "카탈로그",
+    "raw": "회로이론",
+    "view": "시계 90° · 제목 1상자 (ko)"
+   }
+  ],
+  "ms": 6642.8964999940945,
+  "ms_det": 188.17174999276176
+ },
+ "IMG_1590.jpg": {
+  "count": 3,
+  "titles": [
+   "neering it Analys"
+  ],
+  "books": [
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "",
+    "view": "책 전체 (-, ccw)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "3",
+    "view": "반시계 90° · 제목 1상자 (-)"
+   },
+   {
+    "kind": "spine",
+    "final": "neering it Analys",
+    "source": "OCR",
+    "raw": "neering it Analys",
+    "view": "정방향 · 제목 2상자 (en)"
+   }
+  ],
+  "ms": 3541.5291670069564,
+  "ms_det": 135.11616599862464
+ },
+ "IMG_1591.jpg": {
+  "count": 26,
+  "titles": [
+   "공업수학 하",
+   "II",
+   "서진 허건",
+   "심형 한광",
+   "이상",
+   "1현덕 제남",
+   "영균 역"
+  ],
+  "books": [
+   {
+    "kind": "cover",
+    "final": "공업수학 하",
+    "source": "카탈로그",
+    "raw": "KREYSZIG 공업수학 하",
+    "view": "정방향 · 제목 3상자 (en/ko)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "",
+    "view": "책 전체 (en, up)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "E",
+    "view": "책 전체 (en, down)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "틀EE",
+    "view": "책 전체 (mix, up)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "2EE",
+    "view": "책 전체 (en, up)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "E",
+    "view": "책 전체 (en, down)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "",
+    "view": "책 전체 (en, up)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "",
+    "view": "책 전체 (en, up)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "",
+    "view": "책 전체 (en, up)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "",
+    "view": "책 전체 (-, up)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "",
+    "view": "책 전체 (-, up)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "LL",
+    "view": "책 전체 (en, ccw)"
+   },
+   {
+    "kind": "cover",
+    "final": "II",
+    "source": "OCR",
+    "raw": "II",
+    "view": "책 전체 (en, down)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "금",
+    "view": "책 전체 (ko, up)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "I",
+    "view": "책 전체 (en, down)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "큰",
+    "view": "책 전체 (ko, up)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "",
+    "view": "책 전체 (-, cw)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "1",
+    "view": "책 전체 (-, up)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "",
+    "view": "책 전체 (-, up)"
+   },
+   {
+    "kind": "cover",
+    "final": "서진 허건",
+    "source": "OCR",
+    "raw": "서진 허건",
+    "view": "정방향 · 제목 2상자 (ko)"
+   },
+   {
+    "kind": "cover",
+    "final": "심형 한광",
+    "source": "OCR",
+    "raw": "심형 한광",
+    "view": "정방향 · 제목 2상자 (ko)"
+   },
+   {
+    "kind": "cover",
+    "final": "이상",
+    "source": "OCR",
+    "raw": "이상",
+    "view": "정방향 · 제목 1상자 (ko)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "초",
+    "view": "정방향 · 제목 1상자 (ko)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "일",
+    "view": "책 전체 (ko, up)"
+   },
+   {
+    "kind": "cover",
+    "final": "1현덕 제남",
+    "source": "OCR",
+    "raw": "1현덕 제남",
+    "view": "정방향 · 제목 2상자 (ko)"
+   },
+   {
+    "kind": "cover",
+    "final": "영균 역",
+    "source": "OCR",
+    "raw": "영균 역",
+    "view": "정방향 · 제목 2상자 (ko)"
+   }
+  ],
+  "ms": 22187.809833994834,
+  "ms_det": 90.23045799403917
+ },
+ "IMG_1592.jpg": {
+  "count": 2,
+  "titles": [
+   "업수"
+  ],
   "books": [
    {
     "kind": "spine",
@@ -17,136 +302,139 @@
    },
    {
     "kind": "spine",
-    "final": "서진헌·심형 이상구·유 배현덕·양",
+    "final": "업수",
     "source": "OCR",
-    "raw": "서진헌·심형 이상구·유 배현덕·양",
-    "view": "반시계 90° · 제목 3상자 (ko)"
+    "raw": "업수",
+    "view": "정방향 · 제목 1상자 (ko)"
+   }
+  ],
+  "ms": 1657.4186660000123,
+  "ms_det": 192.53179201041348
+ },
+ "IMG_1593.jpg": {
+  "count": 8,
+  "titles": [
+   "회로이론",
+   "gineeri rcuit An",
+   "박종후 이장명 한상수 홍상훈",
+   "배현덕·양영균 김희택·이성철 허건수·한광희 함운철·최항석",
+   "ng o OFO 균용배기 운나]박"
+  ],
+  "books": [
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "5V",
+    "view": "180° · 제목 1상자 (en)"
    },
    {
-    "kind": "spine",
-    "final": "함운철·최형 박제남 공",
+    "kind": "cover",
+    "final": "회로이론",
+    "source": "카탈로그",
+    "raw": "회로이를",
+    "view": "반시계 90° · 제목 1상자 (ko)"
+   },
+   {
+    "kind": "cover",
+    "final": "gineeri rcuit An",
     "source": "OCR",
-    "raw": "함운철·최형 박제남 공",
-    "view": "반시계 90° · 제목 3상자 (ko)"
+    "raw": "gineeri rcuit An",
+    "view": "정방향 · 제목 3상자 (en)"
+   },
+   {
+    "kind": "cover",
+    "final": "박종후 이장명 한상수 홍상훈",
+    "source": "OCR",
+    "raw": "박종후 이장명 한상수 홍상훈",
+    "view": "반시계 90° · 제목 4상자 (ko)"
    },
    {
     "kind": "spine",
     "final": "Unknown",
     "source": "-",
-    "raw": "김",
+    "raw": "학",
+    "view": "정방향 · 제목 1상자 (ko)"
+   },
+   {
+    "kind": "cover",
+    "final": "배현덕·양영균 김희택·이성철 허건수·한광희 함운철·최항석",
+    "source": "OCR",
+    "raw": "배현덕·양영균 김희택·이성철 허건수·한광희 함운철·최항석",
+    "view": "반시계 90° · 제목 4상자 (ko)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "텍스트북스",
     "view": "반시계 90° · 제목 1상자 (ko)"
+   },
+   {
+    "kind": "cover",
+    "final": "ng o OFO 균용배기 운나]박",
+    "source": "OCR",
+    "raw": "ng o OFO 균용배기 운나]박",
+    "view": "정방향 · 제목 4상자 (en/ko)"
    }
-  ]
- },
- "IMG_1587.jpg": {
-  "count": 1,
-  "titles": [
-   "Embedded Recipes"
   ],
-  "ms": 14446.768875000998,
-  "ms_det": 10478.73229101242,
+  "ms": 15934.641500003636,
+  "ms_det": 143.39833399571944
+ },
+ "IMG_1594.jpg": {
+  "count": 6,
+  "titles": [
+   "3그",
+   "Embedded Recipes",
+   "ded R 학 하",
+   "ed 학 하",
+   "dded 학"
+  ],
   "books": [
+   {
+    "kind": "cover",
+    "final": "3그",
+    "source": "OCR",
+    "raw": "3그",
+    "view": "180° · 제목 1상자 (ko)"
+   },
    {
     "kind": "cover",
     "final": "Embedded Recipes",
     "source": "카탈로그",
-    "raw": "EMBEDDED RECIPES",
-    "view": "정방향 · 제목 2상자 (en)"
-   }
-  ]
- },
- "IMG_1588.jpg": {
-  "count": 0,
-  "titles": [],
-  "ms": 9858.334417003789,
-  "ms_det": 9801.339832993108,
-  "books": []
- },
- "IMG_1589.jpg": {
-  "count": 2,
-  "titles": [
-   "J. David I R. Mark"
-  ],
-  "ms": 18444.971082994016,
-  "ms_det": 13816.72245899972,
-  "books": [
-   {
-    "kind": "spine",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "L",
-    "view": "180° · 제목 1상자 (en)"
-   },
-   {
-    "kind": "spine",
-    "final": "J. David I R. Mark",
-    "source": "OCR",
-    "raw": "J. David Irwin I R. Mark Nelms",
-    "view": "시계 90° · 제목 1상자 (en)"
-   }
-  ]
- },
- "IMG_1590.jpg": {
-  "count": 1,
-  "titles": [
-   "Ith sditior"
-  ],
-  "ms": 10790.573167003458,
-  "ms_det": 10100.18341599789,
-  "books": [
-   {
-    "kind": "spine",
-    "final": "Ith sditior",
-    "source": "OCR",
-    "raw": "Ith sditior",
-    "view": "반시계 90° · 제목 1상자 (en)"
-   }
-  ]
- },
- "IMG_1591.jpg": {
-  "count": 3,
-  "titles": [
-   "1를",
-   "양 영 공역"
-  ],
-  "ms": 18611.781832994893,
-  "ms_det": 12757.707291006227,
-  "books": [
-   {
-    "kind": "spine",
-    "final": "1를",
-    "source": "OCR",
-    "raw": "1를",
-    "view": "정방향 · 제목 1상자 (ko)"
-   },
-   {
-    "kind": "spine",
-    "final": "양 영 공역",
-    "source": "OCR",
-    "raw": "양 영 공역",
-    "view": "정방향 · 제목 3상자 (ko)"
+    "raw": "ded Recipes 철",
+    "view": "정방향 · 제목 2상자 (en/ko)"
    },
    {
     "kind": "spine",
     "final": "Unknown",
     "source": "-",
-    "raw": "희",
-    "view": "시계 90° · 제목 1상자 (ko)"
+    "raw": "d",
+    "view": "정방향 · 제목 1상자 (en)"
+   },
+   {
+    "kind": "spine",
+    "final": "ded R 학 하",
+    "source": "OCR",
+    "raw": "ded R 학 하",
+    "view": "정방향 · 제목 3상자 (en/ko)"
+   },
+   {
+    "kind": "spine",
+    "final": "ed 학 하",
+    "source": "OCR",
+    "raw": "ed 학 하",
+    "view": "정방향 · 제목 3상자 (en/ko)"
+   },
+   {
+    "kind": "spine",
+    "final": "dded 학",
+    "source": "OCR",
+    "raw": "dded 학",
+    "view": "정방향 · 제목 2상자 (en/ko)"
    }
-  ]
- },
- "IMG_1593.jpg": {
-  "count": 0,
-  "titles": [],
-  "ms": 10592.918624999584,
-  "ms_det": 10535.696332997759,
-  "books": []
- },
- "IMG_1594.jpg": {
-  "count": 0,
-  "titles": [],
-  "ms": 11305.530375000671,
-  "ms_det": 11248.348749999423,
-  "books": []
+  ],
+  "ms": 17700.124750001123,
+  "ms_det": 287.5756249995902
  }
 }

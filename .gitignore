@@ -7,7 +7,10 @@ __pycache__/
 .ipynb_checkpoints/
 .DS_Store
 runs/
-outputs/train/*/weights/last.pt
+outputs/train/*/weights/
+# 학습 캐시 · 중복 산출물 (models/books_obb_best.pt, web/e_unified.onnx 가 원본)
+datasets/**/*.cache
+models/*.onnx
 
 # 보고서 초안·정리 문서: 사전과제 내용 공개 금지 조건 때문에 공개 저장소에서 제외
 docs/
