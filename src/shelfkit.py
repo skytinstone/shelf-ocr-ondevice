@@ -480,8 +480,9 @@ def crop_upright(img, rect, pad=2, return_tf=False):
     if abs(ang) > 45:
         w, h = h, w
         ang -= 90 if ang > 0 else -90
-    if w > h:
+    if w > h:   # 긴 변이 가로(눕힌 책·90° 돌아간 표지): 90° 더 돌려 세움 (크기만 바꾸면 가운데 좁은 띠만 잘림)
         w, h = h, w
+        ang += 90 if ang <= 0 else -90
     M = cv2.getRotationMatrix2D((cx, cy), ang, 1.0)
     rot = cv2.warpAffine(img, M, (img.shape[1], img.shape[0]), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
     x0, y0 = int(cx - w / 2) + pad, int(cy - h / 2) + pad
@@ -932,10 +933,13 @@ class TitleRuleReader:
             x1, y1, x2, y2 = [int(v) for v in _bbox(b["poly"])]
             pad = max(3, int(0.12 * b["line"]))                                        # 고해상도 크롭에서도 같은 비율의 여백
             subs.append(crop[max(0, y1 - pad):min(H, y2 + pad), max(0, x1 - pad):min(W, x2 + pad)])
-        # (0) 책 단위 글자 방향: 상자 × 4방향을 한국어 모델로 한 번에 읽고, 신뢰도 × 글줄 굵기 합이 최대인 방향
+        # (0) 책 단위 글자 방향: 상자 × 4방향을 한국어 모델로 한 번에 읽고, 신뢰도² × 읽은 글자 수 × 글줄 굵기 합이 최대인 방향
+        #     글자 수를 곱해 긴 제목 한 줄이 제목과 직각으로 쓰인 작은 글자(출판사·판차) 여러 개보다 무겁게 반영되게 함
         res = self.ko.rec([oriented_view(sb, o) for sb in subs for o in ORIENTS])
         ko = {(i, o): res[i * 4 + k] for i in range(len(cand)) for k, o in enumerate(ORIENTS)}
-        orient = max(ORIENTS, key=lambda o: sum(ko[(i, o)][1] * cand[i]["line"] for i in range(len(cand)) if ko[(i, o)][0].strip()))
+        #     투표는 굵은 글줄(가장 굵은 글줄의 60% 이상)만: 책등의 저자 목록·출판사처럼 제목과 직각인 얇은 글줄이 방향을 뒤집지 않게
+        voters = [i for i in range(len(cand)) if cand[i]["line"] >= 0.6 * cand[0]["line"]]
+        orient = max(ORIENTS, key=lambda o: sum(ko[(i, o)][1] ** 2 * len(normalize(ko[(i, o)][0])) * cand[i]["line"] for i in voters))
         calls = 1 + len(res)
         # (2)(3) 영어가 섞인 상자 + 한국어 신뢰도가 낮은 상자(영어를 한글로 잘못 읽었을 수 있음)는 영어 모델로도 읽음
         en_jobs = [i for i in range(len(cand)) if script_of(ko[(i, orient)][0]) in ("en", "mix") or ko[(i, orient)][1] < self.low_conf]
@@ -1273,35 +1277,91 @@ def draw_debug_step1(img, stages, books):
     return np.concatenate([top, np.full((10, top.shape[1], 3), 255, np.uint8), bot], 0)
 
 
+def border_strip(poly, W, H, tol=0.015, thin=0.08):
+    """사진 테두리에 긴 변이 붙은 가는 상자 (키보드·모니터 끝, 사진 밖으로 잘린 물건 조각) → 책으로 세지 않음"""
+    rect = cv2.minAreaRect(np.float32(poly)); w, h = rect[1]
+    if min(w, h) > thin * min(W, H):
+        return False
+    pts = cv2.boxPoints(rect)
+    for i in range(4):
+        p, q = pts[i], pts[(i + 1) % 4]
+        if np.hypot(*(p - q)) < 0.9 * max(w, h):
+            continue
+        if (abs(p[0]) < tol * W and abs(q[0]) < tol * W) or (abs(p[0] - W) < tol * W and abs(q[0] - W) < tol * W) or \
+           (abs(p[1]) < tol * H and abs(q[1]) < tol * H) or (abs(p[1] - H) < tol * H and abs(q[1] - H) < tol * H):
+            return True
+    return False
+
+
+def dedupe_books(books, iou=0.5, inside=0.6):
+    """한 권을 여러 상자로 잡은 경우 정리 (점수 높은 상자부터 남김)
+    (1) 종류와 관계없이 겹침(IoU)이 iou 이상이면 같은 책
+    (2) 더 큰 상자(면적 1.5배 이상) 안에 inside 이상 들어간 작은 상자는 그 책의 일부(표지 속 그림·제목 띠·저자 줄)"""
+    area = [cv2.contourArea(np.float32(b["poly"])) for b in books]
+    order = sorted(range(len(books)), key=lambda i: -books[i]["score"])
+    keep = []
+    for i in order:
+        pi = np.float32(books[i]["poly"]); dup = False
+        for j in keep:
+            I = _poly_inter(pi, np.float32(books[j]["poly"]))
+            if I >= iou * (area[i] + area[j] - I):
+                dup = True; break
+        if not dup:
+            keep.append(i)
+    out = []
+    for i in keep:
+        pi = np.float32(books[i]["poly"])
+        if any(area[j] >= 1.5 * area[i] and _poly_inter(pi, np.float32(books[j]["poly"])) >= inside * area[i] for j in keep if j != i):
+            continue
+        out.append(books[i])
+    return out
+
+
 class UnifiedBookDetector:
     """Step 1 (통합): 책등·표지 2클래스 YOLO11n-OBB 한 번으로 모든 방향의 책을 검출 (tools/train_detector.py 로 학습)
     합성 데이터로 0~360° 회전·뒤집기를 학습해, 근접 촬영에서 사진이 돌아가거나 뒤집혀도 원거리와 같은 방식으로 검출한다.
     기존 BookDetector(책등 모델 + YOLO11x 6회 + 규칙)를 대체하는 On-Device용 경량 구성.
     스프링 노트 판정(FFT)과 읽는 순서 번호 매기기만 규칙으로 남긴다."""
 
-    def __init__(self, weights, imgsz=960, conf=0.35, iou=0.5, textdet=None, device=None):
+    def __init__(self, weights, imgsz=768, conf=0.35, iou=0.5, textdet=None, device=None, zoom=0.0, inside=0.6):
         from ultralytics import YOLO
         self.m = YOLO(str(weights), task="obb")
-        self.imgsz, self.conf, self.iou, self.device = imgsz, conf, iou, device
+        self.imgsz, self.conf, self.iou, self.device, self.zoom, self.inside = imgsz, conf, iou, device, zoom, inside
         self.textdet = textdet or TextBoxDetector()
         self.last = None
 
-    def __call__(self, img):
+    def _predict(self, img, pad=0.0):
+        """pad > 0: 사진 둘레에 회색 여백을 붙여(가까이 찍은 책이 학습 때처럼 화면 안에 들어오게) 검출 후 원래 좌표로"""
         kw = dict(conf=self.conf, iou=self.iou, imgsz=self.imgsz, verbose=False)
         if self.device:
             kw["device"] = self.device
-        r = self.m.predict(img, **kw)[0]
+        H, W = img.shape[:2]; ox, oy = int(W * pad), int(H * pad)
+        src = cv2.copyMakeBorder(img, oy, oy, ox, ox, cv2.BORDER_CONSTANT, value=(114, 114, 114)) if pad else img
+        r = self.m.predict(src, **kw)[0]
+        if r.obb is None:
+            return []
+        return [(p - np.float32([ox, oy]), float(s), int(c)) for p, s, c in
+                zip(r.obb.xyxyxyxy.cpu().numpy(), r.obb.conf.cpu().numpy(), r.obb.cls.cpu().numpy())]
+
+    def __call__(self, img):
+        dets = self._predict(img) + (self._predict(img, self.zoom) if self.zoom else [])
+        H, W = img.shape[:2]; frame = np.float32([[0, 0], [W, 0], [W, H], [0, H]])
         books = []
-        if r.obb is not None:
-            for p, s, c in zip(r.obb.xyxyxyxy.cpu().numpy(), r.obb.conf.cpu().numpy(), r.obb.cls.cpu().numpy()):
-                rect = cv2.minAreaRect(p.astype(np.float32))
-                kind = "cover" if int(c) == 1 else "spine"
-                b = {"kind": kind, "obb": True, "rect": rect, "poly": p.tolist(), "score": float(s),
-                     "short": float(min(rect[1])), "bbox": _bbox(p)}
-                if kind == "spine":                       # 스프링 노트: 책등에 제목이 없으므로 제목은 Unknown
-                    crop = crop_upright(img, rect)
-                    b["spiral"] = spiral_score(crop) >= 0.2 and len(self.textdet(crop)) <= 1
-                books.append(b)
+        for p, s, c in dets:
+            a, clip = cv2.intersectConvexConvex(p.astype(np.float32), frame)   # 여백 쪽으로 나간 부분은 잘라냄
+            if clip is None or a < 64:
+                continue
+            rect = cv2.minAreaRect(clip.reshape(-1, 2)); p = cv2.boxPoints(rect)
+            if border_strip(p, W, H):
+                continue
+            kind = "cover" if c == 1 else "spine"
+            books.append({"kind": kind, "obb": True, "rect": rect, "poly": p.tolist(), "score": s,
+                          "short": float(min(rect[1])), "bbox": _bbox(p)})
+        books = dedupe_books(books, self.iou, self.inside)
+        for b in books:
+            if b["kind"] == "spine":                       # 스프링 노트: 책등에 제목이 없으므로 제목은 Unknown
+                crop = crop_upright(img, b["rect"])
+                b["spiral"] = spiral_score(crop) >= 0.2 and len(self.textdet(crop)) <= 1
         books = order_books(books)
         self.last = {"raw_spines": [b for b in books if b["kind"] == "spine"], "fused": [], "candidates": [],
                      "covers": [b for b in books if b["kind"] == "cover"], "spines": [b for b in books if b["kind"] == "spine"],

@@ -21,6 +21,9 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--mobile", help="모바일 웹 데모 결과 JSON")
 ap.add_argument("--skip-pc", action="store_true")
 ap.add_argument("--rules", action="store_true", help="통합 검출기가 있어도 기존 규칙 방식으로 검출")
+ap.add_argument("--imgsz", type=int, default=768); ap.add_argument("--conf", type=float, default=0.35)
+ap.add_argument("--zoom", type=float, default=0.0, help="사진 둘레 여백 비율로 한 번 더 검출 (0 = 안 함)")
+ap.add_argument("--weights", default=None, help="통합 검출기 가중치 (기본 models/books_obb_best.pt)")
 a = ap.parse_args()
 
 GT = json.load(open(EV / "books_gt.json", encoding="utf-8"))
@@ -56,9 +59,9 @@ if not a.skip_pc:
     import numpy as np, cv2
     from shelfkit import BookDetector, UnifiedBookDetector, PaddleRecEngine, TitleRuleReader, TitleMatcher, detect_image, run_image, load_catalog
     catalog = load_catalog(ROOT); matcher = TitleMatcher(catalog)
-    U = ROOT / "models" / "books_obb_best.pt"
+    U = Path(a.weights) if a.weights else ROOT / "models" / "books_obb_best.pt"
     if U.exists() and not a.rules:
-        det = UnifiedBookDetector(U, imgsz=960, conf=0.35); print("검출기: 통합 YOLO11n-OBB")
+        det = UnifiedBookDetector(U, imgsz=a.imgsz, conf=a.conf, zoom=a.zoom); print(f"검출기: 통합 YOLO11n-OBB {a.imgsz} · 여백 {a.zoom}")
     else:
         det = BookDetector(ROOT / "models" / "spine_obb_best.pt", ROOT / "models" / "yolo11x.pt", imgsz=960, conf=0.45, iou=0.5); print("검출기: 기존 규칙 방식")
     reader = TitleRuleReader(PaddleRecEngine("korean_PP-OCRv5_mobile_rec", "ko"), PaddleRecEngine("en_PP-OCRv5_mobile_rec", "en"), det.textdet)

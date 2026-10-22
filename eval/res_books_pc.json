@@ -13,428 +13,202 @@
     "view": "정방향 · 제목 2상자 (en)"
    }
   ],
-  "ms": 4197.772582992911,
-  "ms_det": 914.0410830004839
+  "ms": 4318.366125007742,
+  "ms_det": 868.5477079998236
  },
  "IMG_1588.jpg": {
-  "count": 1,
+  "count": 2,
   "titles": [
-   "ed Re"
+   "Embedded Recipes"
   ],
   "books": [
    {
     "kind": "spine",
-    "final": "ed Re",
-    "source": "OCR",
-    "raw": "ed Re",
-    "view": "정방향 · 제목 1상자 (en)"
+    "final": "Unknown",
+    "source": "-",
+    "raw": "브",
+    "view": "반시계 90° · 제목 1상자 (ko)"
+   },
+   {
+    "kind": "spine",
+    "final": "Embedded Recipes",
+    "source": "카탈로그",
+    "raw": "Embedded Recipes 2",
+    "view": "시계 90° · 제목 2상자 (-/en)"
    }
   ],
-  "ms": 1322.9634160088608,
-  "ms_det": 143.55500000237953
+  "ms": 14288.444083998911,
+  "ms_det": 209.8567089997232
  },
  "IMG_1589.jpg": {
-  "count": 2,
+  "count": 1,
   "titles": [
-   "안현식·구현철·박종후·이장명 한 한상수·홍상훈공역",
    "회로이론"
   ],
   "books": [
    {
+    "kind": "cover",
+    "final": "회로이론",
+    "source": "카탈로그",
+    "raw": "회로이론",
+    "view": "180° · 제목 1상자 (ko)"
+   }
+  ],
+  "ms": 3136.41925000411,
+  "ms_det": 114.3539999902714
+ },
+ "IMG_1590.jpg": {
+  "count": 2,
+  "titles": [
+   "회로이론",
+   "공업수학 하"
+  ],
+  "books": [
+   {
     "kind": "spine",
-    "final": "안현식·구현철·박종후·이장명 한 한상수·홍상훈공역",
+    "final": "회로이론",
+    "source": "카탈로그",
+    "raw": "회로이론 흔 그   O R 그",
+    "view": "180° · 제목 3상자 (ko/mix)"
+   },
+   {
+    "kind": "cover",
+    "final": "공업수학 하",
+    "source": "카탈로그",
+    "raw": "KREYSZIG 공업수학",
+    "view": "정방향 · 제목 2상자 (en/ko)"
+   }
+  ],
+  "ms": 8255.821665996336,
+  "ms_det": 164.7262500046054
+ },
+ "IMG_1591.jpg": {
+  "count": 1,
+  "titles": [
+   "이택-이성실 주:박대연 텍스트북츠"
+  ],
+  "books": [
+   {
+    "kind": "cover",
+    "final": "이택-이성실 주:박대연 텍스트북츠",
     "source": "OCR",
-    "raw": "안현식·구현철·박종후·이장명 한 한상수·홍상훈공역",
-    "view": "시계 90° · 제목 3상자 (ko)"
+    "raw": "이택-이성실 WILEY 주:박대연 텍스트북츠",
+    "view": "반시계 90° · 제목 4상자 (en/ko)"
+   }
+  ],
+  "ms": 3019.835166996927,
+  "ms_det": 115.93716700735968
+ },
+ "IMG_1592.jpg": {
+  "count": 1,
+  "titles": [
+   "공업수학 6"
+  ],
+  "books": [
+   {
+    "kind": "spine",
+    "final": "공업수학 6",
+    "source": "OCR",
+    "raw": "KREYSZIG 공업수학 6",
+    "view": "시계 90° · 제목 2상자 (-/mix)"
+   }
+  ],
+  "ms": 6424.496166000608,
+  "ms_det": 169.72595799597912
+ },
+ "IMG_1593.jpg": {
+  "count": 6,
+  "titles": [
+   "Embedded Recipes",
+   "회로이론",
+   "공업수학 하"
+  ],
+  "books": [
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "ANEV",
+    "view": "180° · 제목 1상자 (en)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "4",
+    "view": "정방향 · 제목 1상자 (-)"
+   },
+   {
+    "kind": "spine",
+    "final": "Embedded Recipes",
+    "source": "카탈로그",
+    "raw": "Embedded Recipes",
+    "view": "시계 90° · 제목 1상자 (en)"
+   },
+   {
+    "kind": "cover",
+    "final": "Unknown",
+    "source": "-",
+    "raw": "29 7",
+    "view": "180° · 제목 2상자 (-)"
    },
    {
     "kind": "spine",
     "final": "회로이론",
     "source": "카탈로그",
     "raw": "회로이론",
-    "view": "시계 90° · 제목 1상자 (ko)"
-   }
-  ],
-  "ms": 6642.8964999940945,
-  "ms_det": 188.17174999276176
- },
- "IMG_1590.jpg": {
-  "count": 3,
-  "titles": [
-   "neering it Analys"
-  ],
-  "books": [
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "",
-    "view": "책 전체 (-, ccw)"
-   },
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "3",
-    "view": "반시계 90° · 제목 1상자 (-)"
-   },
-   {
-    "kind": "spine",
-    "final": "neering it Analys",
-    "source": "OCR",
-    "raw": "neering it Analys",
-    "view": "정방향 · 제목 2상자 (en)"
-   }
-  ],
-  "ms": 3541.5291670069564,
-  "ms_det": 135.11616599862464
- },
- "IMG_1591.jpg": {
-  "count": 26,
-  "titles": [
-   "공업수학 하",
-   "II",
-   "서진 허건",
-   "심형 한광",
-   "이상",
-   "1현덕 제남",
-   "영균 역"
-  ],
-  "books": [
-   {
-    "kind": "cover",
-    "final": "공업수학 하",
-    "source": "카탈로그",
-    "raw": "KREYSZIG 공업수학 하",
-    "view": "정방향 · 제목 3상자 (en/ko)"
-   },
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "",
-    "view": "책 전체 (en, up)"
-   },
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "E",
-    "view": "책 전체 (en, down)"
-   },
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "틀EE",
-    "view": "책 전체 (mix, up)"
-   },
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "2EE",
-    "view": "책 전체 (en, up)"
-   },
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "E",
-    "view": "책 전체 (en, down)"
-   },
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "",
-    "view": "책 전체 (en, up)"
-   },
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "",
-    "view": "책 전체 (en, up)"
-   },
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "",
-    "view": "책 전체 (en, up)"
-   },
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "",
-    "view": "책 전체 (-, up)"
-   },
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "",
-    "view": "책 전체 (-, up)"
-   },
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "LL",
-    "view": "책 전체 (en, ccw)"
-   },
-   {
-    "kind": "cover",
-    "final": "II",
-    "source": "OCR",
-    "raw": "II",
-    "view": "책 전체 (en, down)"
-   },
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "금",
-    "view": "책 전체 (ko, up)"
-   },
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "I",
-    "view": "책 전체 (en, down)"
-   },
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "큰",
-    "view": "책 전체 (ko, up)"
-   },
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "",
-    "view": "책 전체 (-, cw)"
-   },
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "1",
-    "view": "책 전체 (-, up)"
-   },
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "",
-    "view": "책 전체 (-, up)"
-   },
-   {
-    "kind": "cover",
-    "final": "서진 허건",
-    "source": "OCR",
-    "raw": "서진 허건",
-    "view": "정방향 · 제목 2상자 (ko)"
-   },
-   {
-    "kind": "cover",
-    "final": "심형 한광",
-    "source": "OCR",
-    "raw": "심형 한광",
-    "view": "정방향 · 제목 2상자 (ko)"
-   },
-   {
-    "kind": "cover",
-    "final": "이상",
-    "source": "OCR",
-    "raw": "이상",
-    "view": "정방향 · 제목 1상자 (ko)"
-   },
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "초",
-    "view": "정방향 · 제목 1상자 (ko)"
-   },
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "일",
-    "view": "책 전체 (ko, up)"
-   },
-   {
-    "kind": "cover",
-    "final": "1현덕 제남",
-    "source": "OCR",
-    "raw": "1현덕 제남",
-    "view": "정방향 · 제목 2상자 (ko)"
-   },
-   {
-    "kind": "cover",
-    "final": "영균 역",
-    "source": "OCR",
-    "raw": "영균 역",
-    "view": "정방향 · 제목 2상자 (ko)"
-   }
-  ],
-  "ms": 22187.809833994834,
-  "ms_det": 90.23045799403917
- },
- "IMG_1592.jpg": {
-  "count": 2,
-  "titles": [
-   "업수"
-  ],
-  "books": [
-   {
-    "kind": "spine",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "",
-    "view": "180° · 제목 0상자 (-)"
-   },
-   {
-    "kind": "spine",
-    "final": "업수",
-    "source": "OCR",
-    "raw": "업수",
-    "view": "정방향 · 제목 1상자 (ko)"
-   }
-  ],
-  "ms": 1657.4186660000123,
-  "ms_det": 192.53179201041348
- },
- "IMG_1593.jpg": {
-  "count": 8,
-  "titles": [
-   "회로이론",
-   "gineeri rcuit An",
-   "박종후 이장명 한상수 홍상훈",
-   "배현덕·양영균 김희택·이성철 허건수·한광희 함운철·최항석",
-   "ng o OFO 균용배기 운나]박"
-  ],
-  "books": [
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "5V",
-    "view": "180° · 제목 1상자 (en)"
-   },
-   {
-    "kind": "cover",
-    "final": "회로이론",
-    "source": "카탈로그",
-    "raw": "회로이를",
-    "view": "반시계 90° · 제목 1상자 (ko)"
-   },
-   {
-    "kind": "cover",
-    "final": "gineeri rcuit An",
-    "source": "OCR",
-    "raw": "gineeri rcuit An",
-    "view": "정방향 · 제목 3상자 (en)"
-   },
-   {
-    "kind": "cover",
-    "final": "박종후 이장명 한상수 홍상훈",
-    "source": "OCR",
-    "raw": "박종후 이장명 한상수 홍상훈",
-    "view": "반시계 90° · 제목 4상자 (ko)"
-   },
-   {
-    "kind": "spine",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "학",
-    "view": "정방향 · 제목 1상자 (ko)"
-   },
-   {
-    "kind": "cover",
-    "final": "배현덕·양영균 김희택·이성철 허건수·한광희 함운철·최항석",
-    "source": "OCR",
-    "raw": "배현덕·양영균 김희택·이성철 허건수·한광희 함운철·최항석",
-    "view": "반시계 90° · 제목 4상자 (ko)"
-   },
-   {
-    "kind": "cover",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "텍스트북스",
-    "view": "반시계 90° · 제목 1상자 (ko)"
-   },
-   {
-    "kind": "cover",
-    "final": "ng o OFO 균용배기 운나]박",
-    "source": "OCR",
-    "raw": "ng o OFO 균용배기 운나]박",
-    "view": "정방향 · 제목 4상자 (en/ko)"
-   }
-  ],
-  "ms": 15934.641500003636,
-  "ms_det": 143.39833399571944
- },
- "IMG_1594.jpg": {
-  "count": 6,
-  "titles": [
-   "3그",
-   "Embedded Recipes",
-   "ded R 학 하",
-   "ed 학 하",
-   "dded 학"
-  ],
-  "books": [
-   {
-    "kind": "cover",
-    "final": "3그",
-    "source": "OCR",
-    "raw": "3그",
     "view": "180° · 제목 1상자 (ko)"
    },
    {
-    "kind": "cover",
-    "final": "Embedded Recipes",
+    "kind": "spine",
+    "final": "공업수학 하",
     "source": "카탈로그",
-    "raw": "ded Recipes 철",
-    "view": "정방향 · 제목 2상자 (en/ko)"
-   },
-   {
-    "kind": "spine",
-    "final": "Unknown",
-    "source": "-",
-    "raw": "d",
-    "view": "정방향 · 제목 1상자 (en)"
-   },
-   {
-    "kind": "spine",
-    "final": "ded R 학 하",
-    "source": "OCR",
-    "raw": "ded R 학 하",
-    "view": "정방향 · 제목 3상자 (en/ko)"
-   },
-   {
-    "kind": "spine",
-    "final": "ed 학 하",
-    "source": "OCR",
-    "raw": "ed 학 하",
-    "view": "정방향 · 제목 3상자 (en/ko)"
-   },
-   {
-    "kind": "spine",
-    "final": "dded 학",
-    "source": "OCR",
-    "raw": "dded 학",
-    "view": "정방향 · 제목 2상자 (en/ko)"
+    "raw": "KREYSZIG 공업수학 하 M",
+    "view": "반시계 90° · 제목 3상자 (en/ko/mix)"
    }
   ],
-  "ms": 17700.124750001123,
-  "ms_det": 287.5756249995902
+  "ms": 23058.342707998236,
+  "ms_det": 284.6629169944208
+ },
+ "IMG_1594.jpg": {
+  "count": 4,
+  "titles": [
+   "Embedded Recipes",
+   "Embedded Recipes",
+   "회로이론",
+   "공업수학 하"
+  ],
+  "books": [
+   {
+    "kind": "spine",
+    "final": "Embedded Recipes",
+    "source": "카탈로그",
+    "raw": "EMBEDED REOPES",
+    "view": "정방향 · 제목 2상자 (en)"
+   },
+   {
+    "kind": "spine",
+    "final": "Embedded Recipes",
+    "source": "카탈로그",
+    "raw": "Embedded Recipes",
+    "view": "시계 90° · 제목 1상자 (en)"
+   },
+   {
+    "kind": "spine",
+    "final": "회로이론",
+    "source": "카탈로그",
+    "raw": "회로이론 달.B",
+    "view": "정방향 · 제목 2상자 (ko/mix)"
+   },
+   {
+    "kind": "spine",
+    "final": "공업수학 하",
+    "source": "카탈로그",
+    "raw": "EYSZIG 공업수학 M",
+    "view": "반시계 90° · 제목 2상자 (en/mix)"
+   }
+  ],
+  "ms": 19858.471291998285,
+  "ms_det": 332.9153749946272
  }
 }

@@ -1,8 +1,11 @@
 """책등·표지 통합 검출기(YOLO11n-OBB, 2클래스) 학습용 합성 데이터 생성
 
 재료(datasets/synth_assets)의 책등·표지 크롭을 배경 위에 여러 방향·크기로 붙여 정확한 회전 상자 라벨을 만든다.
-장면: 가까이 찍은 표지 / 가까이 찍은 책등 / 눕혀 쌓은 책(+세운 책) / 책장 줄 / 표지 진열 / 흩어진 책
-방해물(기둥·막대·상자·원형 소품)은 라벨 없이 붙여 오검출을 줄인다. LLM은 쓰지 않는다 (라벨 = 붙인 위치).
+장면: 가까이 찍은 표지(화면을 넘쳐 잘린 표지 포함) / 가까이 찍은 책등(손에 든 두꺼운 책 포함) / 눕혀 쌓은 책(+윗면·세운 책)
+      / 책장 줄 / 표지 진열 / 흩어진 책
+재료: 실사진 크롭 + 글자를 그려 넣은 가상 표지·책등(tools/synth/procedural.py)
+방해물(기둥·막대·상자·원형 소품·모니터·키보드·태블릿, 쌓인 책의 윗면)은 라벨 없이 붙여 오검출을 줄인다.
+화면 밖으로 잘린 책은 보이는 부분의 최소 회전 사각형을 라벨로 쓴다. LLM은 쓰지 않는다 (라벨 = 붙인 위치).
 
 사용법 (shelf_ocr_test 폴더에서):  python tools/synth/make_dataset.py --train 1600 --val 200
 결과: datasets/books_obb/{images,labels}/{train,val}, datasets/books_obb/data.yaml  (클래스 0 spine, 1 cover)
@@ -10,21 +13,33 @@
 import sys, os, random, argparse, math
 from pathlib import Path
 import numpy as np, cv2
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import procedural as PR
 
 ROOT = Path(__file__).resolve().parents[2]
 A = ROOT / "datasets" / "synth_assets"
-OUT = ROOT / "datasets" / "books_obb"
 ap = argparse.ArgumentParser()
 ap.add_argument("--train", type=int, default=1600); ap.add_argument("--val", type=int, default=200)
 ap.add_argument("--size", type=int, default=1024); ap.add_argument("--seed", type=int, default=0)
 ap.add_argument("--no-real", action="store_true", help="기존 실사진(자동 라벨)을 학습에 넣지 않음")
+ap.add_argument("--out", default=None, help="결과 폴더 (기본 datasets/books_obb)")
 args = ap.parse_args()
 rng = random.Random(args.seed); np.random.seed(args.seed)
 SZ = args.size
+OUT = Path(args.out) if args.out else ROOT / "datasets" / "books_obb"
 
 load = lambda d: [cv2.imread(str(p)) for p in sorted((A / d).glob("*.jpg"))]
 SPINES, COVERS, BGS = load("spine"), load("cover"), load("bg")
 print(f"재료: 책등 {len(SPINES)} · 표지 {len(COVERS)} · 배경 {len(BGS)}")
+
+
+def a_cover():
+    """표지 재료: 실사진 크롭 45% / 가상 표지 55%"""
+    return rng.choice(COVERS) if COVERS and rng.random() < 0.45 else PR.make_cover(rng, COVERS + BGS, rng.choice([640, 900, 1200]))
+
+
+def a_spine():
+    return rng.choice(SPINES) if SPINES and rng.random() < 0.45 else PR.make_spine(rng, rng.choice([700, 1000, 1400]))
 
 
 # ---------------------------------------------------------------- 배경
@@ -120,45 +135,73 @@ Q = [0, 90, 180, 270]
 
 
 # ---------------------------------------------------------------- 장면
+def edge_book(cv, placed):
+    """사진 가장자리에 걸친 다른 책 일부 (보이는 만큼만 라벨)"""
+    cls = int(rng.random() < 0.5); b = a_cover() if cls else a_spine()
+    bw, bh = cover_dims(b, SZ * rng.uniform(0.4, 0.8)) if cls else spine_dims(b, SZ * rng.uniform(0.5, 0.9))
+    side = rng.choice(["t", "b", "l", "r"]); k = rng.uniform(0.25, 0.45)
+    cx, cy = {"t": (SZ / 2, -bh * (0.5 - k) + 0), "b": (SZ / 2, SZ + bh * (0.5 - k)), "l": (-bw * (0.5 - k), SZ / 2), "r": (SZ + bw * (0.5 - k), SZ / 2)}[side]
+    try_place(cv, placed, b, cls, cx + rng.uniform(-0.2, 0.2) * SZ * (side in "tb"), cy + rng.uniform(-0.2, 0.2) * SZ * (side in "lr"), bw, bh,
+              rng.choice(Q) + rng.uniform(-6, 6), need_vis=0.2)
+
+
 def scene_close_cover(cv, placed):
-    a = rng.choice(COVERS); w, h = cover_dims(a, SZ * rng.uniform(0.5, 0.95))
+    a = a_cover()
+    big = rng.random() < 0.45                                   # 화면을 꽉 채우거나 넘쳐 잘린 표지
+    w, h = cover_dims(a, SZ * (rng.uniform(0.95, 1.5) if big else rng.uniform(0.5, 0.95)))
     ang = rng.choice(Q) + rng.uniform(-12, 12)
-    try_place(cv, placed, a, 1, SZ / 2 + rng.uniform(-0.12, 0.12) * SZ, SZ / 2 + rng.uniform(-0.12, 0.12) * SZ, w, h, ang, need_vis=0.75)
+    j = 0.2 if big else 0.12
+    try_place(cv, placed, a, 1, SZ / 2 + rng.uniform(-j, j) * SZ, SZ / 2 + rng.uniform(-j, j) * SZ, w, h, ang, need_vis=0.35 if big else 0.75)
     if rng.random() < 0.4:   # 가장자리에 다른 책 일부
-        b = rng.choice(SPINES); sw, sh = spine_dims(b, SZ * rng.uniform(0.5, 0.9))
-        try_place(cv, placed, b, 0, rng.choice([sw * 0.4, SZ - sw * 0.4]), SZ / 2, sw, sh, rng.choice([0, 180]) + rng.uniform(-5, 5), need_vis=0.5)
+        edge_book(cv, placed)
 
 
 def scene_close_spine(cv, placed):
-    a = rng.choice(SPINES); w, h = spine_dims(a, SZ * rng.uniform(0.6, 0.98))
+    a = a_spine(); thick = rng.random() < 0.4                   # 손에 든 두꺼운 책: 책등 폭이 사진의 10~30%
+    w, h = spine_dims(a, SZ * (rng.uniform(0.85, 1.4) if thick else rng.uniform(0.6, 0.98)))
+    if thick:
+        w = max(w, SZ * rng.uniform(0.1, 0.3))
     ang = rng.choice(Q) + rng.uniform(-10, 10)
-    try_place(cv, placed, a, 0, SZ / 2 + rng.uniform(-0.1, 0.1) * SZ, SZ / 2 + rng.uniform(-0.15, 0.15) * SZ, w, h, ang, need_vis=0.8)
+    cx, cy = SZ / 2 + rng.uniform(-0.1, 0.1) * SZ, SZ / 2 + rng.uniform(-0.15, 0.15) * SZ
+    if thick and rng.random() < 0.6:   # 비스듬히 보이는 윗면(표지)·옆면(종이) — 같은 책이므로 라벨 없음
+        side_face(cv, cx, cy, w, h, ang)
+    try_place(cv, placed, a, 0, cx, cy, w, h, ang, need_vis=0.45 if thick else 0.8)
     if rng.random() < 0.4:   # 아래·위에 걸친 다른 책
-        b = rng.choice(COVERS + SPINES); cls = 1 if any(b is c for c in COVERS) else 0
-        bw, bh = cover_dims(b, SZ * 0.6) if cls else spine_dims(b, SZ * 0.8)
-        try_place(cv, placed, b, cls, SZ / 2, rng.choice([0.05, 0.95]) * SZ, bw, bh, rng.choice(Q) + rng.uniform(-8, 8), need_vis=0.5)
+        edge_book(cv, placed)
+
+
+def side_face(cv, cx, cy, w, h, ang, face_h=None):
+    """책등(폭 w, 길이 h, 각도 ang) 한쪽 긴 변에 붙은 윗면: 납작하게 눌린 표지 또는 종이 묶음 (라벨 없음)"""
+    face_h = face_h or w * rng.uniform(0.3, 1.6)
+    t = math.radians(ang); s = rng.choice([-1, 1])
+    ox, oy = math.cos(t) * (w / 2 + face_h / 2) * s, math.sin(t) * (w / 2 + face_h / 2) * s   # 책등 폭 방향으로 옆
+    face = a_cover() if rng.random() < 0.7 else np.ascontiguousarray(np.rot90(PR.page_block(rng, h, face_h)))
+    place(cv, face, cx + ox, cy + oy, face_h, h * rng.uniform(0.97, 1.02), ang)
 
 
 def scene_stack(cv, placed):
-    n = rng.randint(2, 5); L = SZ * rng.uniform(0.45, 0.85); y = SZ * rng.uniform(0.75, 0.95)
+    n = rng.randint(1, 5); L = SZ * rng.uniform(0.45, 0.95); y = SZ * rng.uniform(0.75, 0.95)
     x0 = SZ * rng.uniform(0.08, 0.5) + L / 2 if rng.random() < 0.5 else SZ / 2
     x0 = min(x0, SZ - L / 2 - 5)
+    top = None
     for _ in range(n):
-        a = rng.choice(SPINES); th, _ = spine_dims(a, L * rng.uniform(0.85, 1.1))
-        th = min(th, SZ * 0.15)
+        a = a_spine(); th, _ = spine_dims(a, L * rng.uniform(0.85, 1.1))
+        th = min(max(th, SZ * rng.uniform(0.03, 0.08)), SZ * 0.18)
         cy = y - th / 2
         ang = rng.choice([90, 270]) + rng.uniform(-3, 3)            # 눕힌 책: 긴 변이 가로
-        if not try_place(cv, placed, a, 0, x0 + rng.uniform(-0.04, 0.04) * L, cy, th, L * rng.uniform(0.9, 1.05), ang, need_vis=0.7):
+        cx, bl = x0 + rng.uniform(-0.04, 0.04) * L, L * rng.uniform(0.9, 1.05)
+        if not try_place(cv, placed, a, 0, cx, cy, th, bl, ang, need_vis=0.7):
             break
+        top = (cx, cy, th, bl, ang)
         y -= th + rng.uniform(0, 4)
         if y < SZ * 0.15: break
+    if top and rng.random() < 0.6:   # 맨 위 책의 윗면(비스듬히 보이는 표지) — 같은 책이므로 라벨 없음
+        cx, cy, th, bl, ang = top; fh = th * rng.uniform(0.4, 2.5)
+        place(cv, a_cover(), cx, cy - th / 2 - fh / 2, bl * rng.uniform(0.95, 1.0), fh, rng.uniform(-3, 3))
     if rng.random() < 0.6:   # 옆에 세운 책
-        a = rng.choice(SPINES); w, h = spine_dims(a, SZ * rng.uniform(0.5, 0.8))
+        a = a_spine(); w, h = spine_dims(a, SZ * rng.uniform(0.5, 0.8))
         bottom = SZ * rng.uniform(0.85, 0.97)
         try_place(cv, placed, a, 0, min(SZ - w / 2 - 2, x0 + L / 2 + w / 2 + rng.uniform(5, 40)), bottom - h / 2, w, h, rng.choice([0, 180]) + rng.uniform(-4, 4), need_vis=0.75)
-    if rng.random() < 0.3:   # 위에 눕힌 표지
-        b = rng.choice(COVERS); bw, bh = cover_dims(b, L * 0.8)
-        try_place(cv, placed, b, 1, x0, max(bh / 2, y - bh * 0.35), bw, bh * 0.6, rng.choice(Q) + rng.uniform(-6, 6), need_vis=0.6)
 
 
 def scene_shelf(cv, placed):
@@ -169,7 +212,7 @@ def scene_shelf(cv, placed):
         cv2.rectangle(cv, (0, int(base)), (SZ, int(base) + rng.randint(8, 25)), [rng.randint(170, 250)] * 3, -1)   # 선반 판
         x = rng.uniform(-10, 60); flip = rng.random() < 0.15
         while x < SZ - 10:
-            a = rng.choice(SPINES); w, h = spine_dims(a, H * rng.uniform(0.75, 1.1))
+            a = a_spine(); w, h = spine_dims(a, H * rng.uniform(0.75, 1.1))
             tilt = rng.uniform(-3, 3) if rng.random() < 0.8 else rng.uniform(-12, 12)
             ok = try_place(cv, placed, a, 0, x + w / 2, base - h / 2, w, h, (180 if flip else 0) + tilt, need_vis=0.6)
             x += w + (rng.uniform(0, 3) if ok else 10)
@@ -179,7 +222,7 @@ def scene_display(cv, placed):
     n = rng.randint(3, 12); cols = rng.randint(2, 4); L = SZ / cols * rng.uniform(0.6, 0.9)
     for i in range(n * 3):
         if len(placed) >= n: break
-        a = rng.choice(COVERS); w, h = cover_dims(a, L)
+        a = a_cover(); w, h = cover_dims(a, L)
         try_place(cv, placed, a, 1, rng.uniform(w / 2, SZ - w / 2), rng.uniform(h / 2, SZ - h / 2), w, h, rng.choice([0, 0, 0, 180, 90, 270]) + rng.uniform(-8, 8), need_vis=0.65)
 
 
@@ -187,13 +230,13 @@ def scene_mixed(cv, placed):
     for _ in range(rng.randint(3, 9) * 3):
         if len(placed) >= 9: break
         if rng.random() < 0.5:
-            a = rng.choice(COVERS); w, h = cover_dims(a, SZ * rng.uniform(0.2, 0.45)); cls = 1
+            a = a_cover(); w, h = cover_dims(a, SZ * rng.uniform(0.2, 0.45)); cls = 1
         else:
-            a = rng.choice(SPINES); w, h = spine_dims(a, SZ * rng.uniform(0.3, 0.7)); cls = 0
+            a = a_spine(); w, h = spine_dims(a, SZ * rng.uniform(0.3, 0.7)); cls = 0
         try_place(cv, placed, a, cls, rng.uniform(0, SZ), rng.uniform(0, SZ), w, h, rng.uniform(0, 360), need_vis=0.65)
 
 
-SCENES = [(scene_close_cover, 0.2), (scene_close_spine, 0.15), (scene_stack, 0.22), (scene_shelf, 0.18), (scene_display, 0.13), (scene_mixed, 0.12)]
+SCENES = [(scene_close_cover, 0.24), (scene_close_spine, 0.18), (scene_stack, 0.22), (scene_shelf, 0.16), (scene_display, 0.1), (scene_mixed, 0.1)]
 
 
 def distractors(cv, placed):
@@ -213,15 +256,25 @@ def distractors(cv, placed):
             cv2.rectangle(cv, (x, y), (x + w, y + h), col, -1); cv2.rectangle(cv, (x, y), (x + w, y + h), [max(0, c - 60) for c in col], 3)
         else:            # 원형 소품
             cv2.circle(cv, (rng.randint(0, SZ), rng.randint(0, SZ)), rng.randint(20, 120), col, -1)
+    for _ in range(rng.choice([0, 1, 1, 2])):   # 모니터·노트북 화면(글줄 있음) · 키보드 · 태블릿/휴대폰
+        kind = rng.random(); cy = rng.uniform(0, SZ)
+        if kind < 0.45:   # 책 뒤의 모니터: 주로 사진 위쪽, 가장자리에 걸치기도 함
+            w, h = rng.randint(SZ // 3, int(SZ * 1.2)), rng.randint(SZ // 5, SZ // 2); im = PR.screen(rng, w, h); cy = rng.uniform(-0.1, 0.5) * SZ
+        elif kind < 0.7:
+            w, h = rng.randint(SZ // 3, SZ), rng.randint(SZ // 12, SZ // 5); im = PR.keyboard(rng, w, h)
+        else:
+            w, h = rng.randint(SZ // 8, SZ // 2), rng.randint(SZ // 10, SZ // 3); im = PR.tablet(rng, w, h)
+        place(cv, im, rng.uniform(0, SZ), cy, w, h, rng.choice([0, 0, 90]) + rng.uniform(-8, 8))
 
 
 def finish(cv, placed):
     """원근 왜곡·조명·노이즈·JPEG 품질"""
+    # 원근: 안쪽 사각형을 화면 전체로 펴서 가장자리에 빈 곳·반사 줄무늬가 생기지 않게 (테두리 띠를 책으로 배우지 않도록)
     d = SZ * rng.uniform(0, 0.07)
-    src = np.float32([[0, 0], [SZ, 0], [SZ, SZ], [0, SZ]])
-    dst = src + np.float32([[rng.uniform(-d, d), rng.uniform(-d, d)] for _ in range(4)])
+    dst = np.float32([[0, 0], [SZ, 0], [SZ, SZ], [0, SZ]])
+    src = dst + np.float32([[sx * rng.uniform(0, d), sy * rng.uniform(0, d)] for sx, sy in [(1, 1), (-1, 1), (-1, -1), (1, -1)]])
     M = cv2.getPerspectiveTransform(src, dst)
-    cv = cv2.warpPerspective(cv, M, (SZ, SZ), borderMode=cv2.BORDER_REFLECT)
+    cv = cv2.warpPerspective(cv, M, (SZ, SZ), borderMode=cv2.BORDER_REPLICATE)
     polys = [(cv2.perspectiveTransform(p[None], M)[0], c) for p, c in placed]
     g = np.linspace(rng.uniform(0.7, 1.0), rng.uniform(0.95, 1.2), SZ, dtype=np.float32)
     cv = cv.astype(np.float32) * (g[:, None, None] if rng.random() < 0.5 else g[None, :, None])
@@ -243,8 +296,15 @@ def make_one():
 def write(split, i, img, polys, H=SZ, W=SZ):
     cv2.imwrite(str(OUT / "images" / split / f"syn_{i:05d}.jpg"), img, [cv2.IMWRITE_JPEG_QUALITY, rng.randint(70, 95)])
     lines = []
+    frame = np.float32([[0, 0], [W - 1, 0], [W - 1, H - 1], [0, H - 1]])
     for p, c in polys:
-        p = np.clip(p, 0, [W - 1, H - 1]) / [W, H]
+        a, clip = cv2.intersectConvexConvex(np.float32(p), frame)
+        if clip is None or a < 0.25 * cv2.contourArea(np.float32(p)) or a < 64:
+            continue
+        r = cv2.minAreaRect(clip.reshape(-1, 2))        # 화면 밖으로 잘린 책: 보이는 부분의 최소 회전 사각형
+        if a < 0.97 * cv2.contourArea(np.float32(p)) and min(r[1]) < 0.035 * min(W, H):   # 가장자리에 아주 조금 걸친 조각은 라벨 없이 (테두리 띠 오검출 방지)
+            continue
+        p = np.clip(cv2.boxPoints(r), 0, [W - 1, H - 1]) / [W, H]
         lines.append(f"{c} " + " ".join(f"{v:.6f}" for v in p.ravel()))
     (OUT / "labels" / split / f"syn_{i:05d}.txt").write_text("\n".join(lines))
 

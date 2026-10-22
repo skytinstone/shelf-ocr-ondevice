@@ -14,3 +14,8 @@ models/*.onnx
 
 # 보고서 초안·정리 문서: 사전과제 내용 공개 금지 조건 때문에 공개 저장소에서 제외
 docs/
+
+# 외부 공개 데이터 (Open Images 등): 라이선스·용량 때문에 저장소에 올리지 않음 (tools/openimages_books.py로 다시 받음)
+datasets/openimages/
+datasets/books_obb/images/train/oi_*
+datasets/books_obb/labels/train/oi_*

@@ -925,7 +925,7 @@ const DEVICES = [
 ].map(([group, name, chip, ram, year, reported]) => ({ group, name, chip, ram, year, reported: !!reported }));
 
 // 앱 버전: 최종 제출 전까지 0.x 유지, 패치마다 0.10 → 0.11 → 0.12 … 로 하나씩 올림
-const APP_VERSION = "0.10", APP_UPDATED = "2026-10-22 17:25 (KST)";
+const APP_VERSION = "0.11", APP_UPDATED = "2026-10-22 20:33 (KST)";
 
 // 최종모델(E) 용량 · 메모리 (MB). 검출기는 직접 학습한 YOLO11n-OBB (책등·표지 2클래스, 40에포크)
 const MODEL_INFO = {
@@ -978,7 +978,7 @@ const SP = (() => {
     while (ang > Math.PI / 2) ang -= Math.PI;
     while (ang <= -Math.PI / 2) ang += Math.PI;
     if (Math.abs(ang) > Math.PI / 4) { [w, h] = [h, w]; ang -= ang > 0 ? Math.PI / 2 : -Math.PI / 2; }
-    if (w > h) [w, h] = [h, w];
+    if (w > h) { [w, h] = [h, w]; ang += ang <= 0 ? Math.PI / 2 : -Math.PI / 2; }   // 긴 변이 가로: 90° 더 돌려 세움 (크기만 바꾸면 가운데 좁은 띠만 잘림)
     const W = Math.max(1, Math.round(w - 2 * pad)), H = Math.max(1, Math.round(h - 2 * pad));
     const cv = mk(W, H), g = cv.getContext("2d");
     g.imageSmoothingEnabled = true; if ("imageSmoothingQuality" in g) g.imageSmoothingQuality = "high";
@@ -1203,10 +1203,12 @@ if (typeof module !== "undefined") module.exports = SP;
 const EP = (() => {
   const ACCEPT = 72;
   const CFG = {
+    unified: { imgsz: 960, conf: 0.35, iou: 0.5, zoom: 0, inside: 0.6 },   // 입력 크기·여백은 e_unified.json(내보낼 때 기록)이 있으면 그 값
     spine: { conf: 0.45, iou: 0.5, minAspect: 2.5, imgsz: 960 },   // 노트북 튜닝 셀이 고른 값
     coverSizes: [960], coverRot180: false,                            // PC: [960, 1280, 1600] × (원본, 180°)
     coverConf: 0.02, minSupport: 0.12, spineSceneSupport: 0.35, maxAspect: 2.4, minArea: 0.003,
     maxRead: 6, orientBoxes: 2, maxBoxes: 4, ratio: 2.0, minConf: 0.5, // PC: orientBoxes = maxRead(6)
+    recSide: 1600, recCropMax: 2400,   // 글자 읽기용 크롭 해상도 (긴 변 기준). 책장 9장 실험에서 3000px이 1600px보다 낫지 않아 검출 사진과 같은 1600 (메모리 절약)
   };
 
   // ---------------------------------------------------------------- 기하
@@ -1263,6 +1265,8 @@ const EP = (() => {
 
   // ---------------------------------------------------------------- 캔버스 도우미
   let mk = null, lastYield = 0;
+  // 다 쓴 임시 캔버스는 크기를 0으로 만들어 바로 메모리를 돌려줌 (iOS Safari는 캔버스 메모리 합계 한도가 있고 회수가 늦음)
+  const free = (...cs) => { for (const c of cs) if (c && c.getContext) { c.width = 0; c.height = 0; } };
   // 계산 중에도 화면(진행 막대)이 갱신되도록 약 60ms마다 한 번 이벤트 루프에 양보
   async function breathe() { const t = Date.now(); if (t - lastYield > 60) { lastYield = t; await new Promise((r) => setTimeout(r, 0)); } }
   function cropRect(src, x1, y1, x2, y2) {
@@ -1273,21 +1277,28 @@ const EP = (() => {
     g.translate(c.width / 2, c.height / 2); g.rotate(k * Math.PI / 2); g.drawImage(src, -sw / 2, -sh / 2); return c;
   }
   // 회전 박스를 '세로로 긴 + 위쪽이 위'로 세워 자르기 (crop_upright). 크롭 좌표 → 원본 좌표 변환도 반환
-  function cropUpright(src, b, pad = 2) {
+  // k: 크롭 배율(검출 사진 1px → 크롭 kpx), q: src 해상도 / 검출 사진 해상도 (원본 사진에서 자를 때)
+  function cropUpright(src, b, pad = 2, k = 1, q = 1) {
     let { cx, cy, w, h, ang } = b;
     while (ang > Math.PI / 2) ang -= Math.PI;
     while (ang <= -Math.PI / 2) ang += Math.PI;
     if (Math.abs(ang) > Math.PI / 4) { [w, h] = [h, w]; ang -= ang > 0 ? Math.PI / 2 : -Math.PI / 2; }
-    if (w > h) [w, h] = [h, w];
-    const W = Math.max(1, Math.round(w - 2 * pad)), H = Math.max(1, Math.round(h - 2 * pad));
+    if (w > h) { [w, h] = [h, w]; ang += ang <= 0 ? Math.PI / 2 : -Math.PI / 2; }   // 긴 변이 가로: 90° 더 돌려 세움 (크기만 바꾸면 가운데 좁은 띠만 잘림)
+    const W = Math.max(1, Math.round(k * w - 2 * pad)), H = Math.max(1, Math.round(k * h - 2 * pad));
     const cv = mk(W, H), g = cv.getContext("2d");
     g.imageSmoothingEnabled = true; if ("imageSmoothingQuality" in g) g.imageSmoothingQuality = "high";
-    g.translate(W / 2, H / 2); g.rotate(-ang); g.drawImage(src, -cx, -cy);
+    g.translate(W / 2, H / 2); g.rotate(-ang); g.scale(k / q, k / q); g.drawImage(src, -cx * q, -cy * q);
     const c = Math.cos(ang), s = Math.sin(ang);
-    const tf = ([u, v]) => { const x = u - W / 2, y = v - H / 2; return [cx + x * c - y * s, cy + x * s + y * c]; };
+    const tf = ([u, v]) => { const x = (u - W / 2) / k, y = (v - H / 2) / k; return [cx + x * c - y * s, cy + x * s + y * c]; };
     return { crop: cv, tf };
   }
-  function cropBook(img, bk) {
+  // hi: 원본 사진(검출은 줄인 사진 img에서, 글자 읽기용 크롭은 원본에서 잘라 작은 글씨를 살림)
+  function cropBook(img, bk, hi) {
+    if (hi && (bk.kind === "spine" || bk.obb)) {
+      const q = (hi.naturalWidth || hi.width) / img.width;
+      const k = Math.min(q, CFG.recSide / Math.max(img.width, img.height), CFG.recCropMax / Math.max(1, bk.w, bk.h));
+      if (k > 1.05) return cropUpright(hi, bk, 2, k, q);
+    }
     if (bk.kind === "spine" || bk.obb) return cropUpright(img, bk);
     let [x1, y1, x2, y2] = bk.bbox.map(Math.round); x1 = Math.max(0, x1); y1 = Math.max(0, y1); x2 = Math.min(img.width, x2); y2 = Math.min(img.height, y2);
     return { crop: cropRect(img, x1, y1, x2, y2), tf: ([u, v]) => [u + x1, v + y1] };
@@ -1492,15 +1503,43 @@ const EP = (() => {
   }
 
   // Step 1 (통합 검출기): 모든 방향의 책등·표지를 YOLO11n-OBB 한 번으로 검출 → 스프링 노트 판정 → 읽는 순서
-  const UCFG = { imgsz: 960, conf: 0.35, iou: 0.5 };
+  // 한 권을 여러 상자로 잡은 경우 정리 (shelfkit.dedupe_books): 점수 높은 상자부터
+  //  (1) 종류와 관계없이 IoU ≥ iou면 같은 책  (2) 1.5배 이상 큰 상자 안에 inside 이상 들어간 작은 상자는 그 책의 일부(표지 속 그림·제목 띠·저자 줄)
+  // 사진 테두리에 긴 변이 붙은 가는 상자 (키보드·모니터 끝, 잘린 물건 조각)는 책으로 세지 않음 (shelfkit.border_strip)
+  function borderStrip(r, W, H, tol = 0.015, thin = 0.08) {
+    if (Math.min(r.w, r.h) > thin * Math.min(W, H)) return false;
+    const P = r.pts, L = Math.max(r.w, r.h);
+    for (let i = 0; i < 4; i++) {
+      const p = P[i], q = P[(i + 1) % 4]; if (Math.hypot(p[0] - q[0], p[1] - q[1]) < 0.9 * L) continue;
+      const near = (k, lim, S) => Math.abs(p[k] - lim) < tol * S && Math.abs(q[k] - lim) < tol * S;
+      if (near(0, 0, W) || near(0, W, W) || near(1, 0, H) || near(1, H, H)) return true;
+    }
+    return false;
+  }
+  function dedupeBooks(books, iou, inside) {
+    const ar = books.map((b) => polyArea(b.poly)), order = books.map((_, i) => i).sort((i, j) => books[j].score - books[i].score), keep = [];
+    for (const i of order) if (keep.every((j) => { const I = polyInter(books[i].poly, books[j].poly); return I < iou * (ar[i] + ar[j] - I); })) keep.push(i);
+    return keep.filter((i) => !keep.some((j) => j !== i && ar[j] >= 1.5 * ar[i] && polyInter(books[i].poly, books[j].poly) >= inside * ar[i])).map((i) => books[i]);
+  }
   async function detectBooksUnified(img, rt) {
+    const U = CFG.unified, frame = [[0, 0], [img.width, 0], [img.width, img.height], [0, img.height]];
+    let dets = await rt.unified(img, U);
+    if (U.zoom) dets = dets.concat(await rt.unified(img, U, U.zoom));   // 사진 둘레 여백: 가까이 찍어 화면을 넘친 책도 화면 안에 들어오게
+    const found = [];
+    for (const d of dets) {
+      const clip = clipConvex(boxPoly(d), frame);                        // 사진 밖으로 나간 부분은 잘라냄
+      if (clip.length < 3 || polyArea(clip) < 64) continue;
+      const r = minAreaRect(clip), poly = r.pts;
+      if (borderStrip(r, img.width, img.height)) continue;
+      found.push({ ...d, cx: r.cx, cy: r.cy, w: r.w, h: r.h, ang: r.ang, obb: true, poly, bbox: bboxOf(poly), short: Math.min(r.w, r.h) });
+    }
     const books = [];
-    for (const b of await rt.unified(img, UCFG)) {
-      const poly = boxPoly(b), bk = { ...b, obb: true, poly, bbox: bboxOf(poly), short: Math.min(b.w, b.h) };
+    for (const bk of dedupeBooks(found, U.iou, U.inside)) {
       if (bk.kind === "spine") {
         await breathe();
         const { crop } = cropUpright(img, bk);
         bk.spiral = spiralScore(crop) >= 0.2 && (await rt.textDet(crop)).length <= 1;
+        free(crop);
       }
       books.push(bk);
     }
@@ -1605,6 +1644,7 @@ const EP = (() => {
     if (!polys.length) {
       const vs = ORIENTS.map((o) => [o, orientedView(crop, o, SP)]);
       const ko = await rt.recKo(vs.map((v) => v[1]));
+      const freeViews = () => free(...vs.map((v) => v[1]).filter((c) => c !== crop));
       let bi = 0; ko.forEach((r, i) => { if (r[1] > ko[bi][1]) bi = i; });
       let [text, conf] = ko[bi], lang = scriptOf(text) || "-", view = vs[bi][0], calls = vs.length;
       if (lang === "en" || lang === "mix") {
@@ -1612,7 +1652,7 @@ const EP = (() => {
         let ei = 0; en.forEach((r, i) => { if (r[1] > en[ei][1]) ei = i; });
         if (lang === "en") { text = en[ei][0]; conf = en[ei][1]; view = vs[ei][0]; } else text = mergeMixed(text, en[bi][0]);
       }
-      text = clean(text);
+      freeViews(); text = clean(text);
       const [s, m] = text ? decide(text, matcher) : [0, []];
       return finish(text, conf, s, m, `책 전체 (${lang}, ${view})`, calls + 1, []);
     }
@@ -1620,19 +1660,22 @@ const EP = (() => {
     const cand = [...boxes].sort((a, b) => b.line - a.line).slice(0, CFG.maxRead);
     const W = crop.width, H = crop.height;
     const subs = cand.map((b) => { const [x1, y1, x2, y2] = bboxOf(b.poly).map((v) => Math.trunc(v)); return cropRect(crop, Math.max(0, x1 - 3), Math.max(0, y1 - 3), Math.min(W, x2 + 3), Math.min(H, y2 + 3)); });
-    // (0) 책 단위 글자 방향: 굵은 상자 orientBoxes개 × 4방향 → 신뢰도 × 글줄 굵기 합이 최대인 방향
-    const nO = Math.min(CFG.orientBoxes, cand.length), jobs = [];
+    // (0) 책 단위 글자 방향: 굵은 상자 orientBoxes개 × 4방향 → 신뢰도² × 읽은 글자 수 × 글줄 굵기 합이 최대인 방향
+    //     글자 수를 곱해 긴 제목 한 줄이 제목과 직각으로 쓰인 작은 글자(출판사·판차) 여러 개보다 무겁게 반영되게 함
+    //     투표는 굵은 글줄(가장 굵은 글줄의 60% 이상)만: 책등의 저자 목록·출판사처럼 제목과 직각인 얇은 글줄이 방향을 뒤집지 않게
+    const nO = Math.max(1, Math.min(CFG.orientBoxes, cand.filter((b) => b.line >= 0.6 * cand[0].line).length)), jobs = [];
     for (let i = 0; i < nO; i++) for (const o of ORIENTS) jobs.push([i, o]);
-    const res = await rt.recKo(jobs.map(([i, o]) => orientedView(subs[i], o, SP)));
+    const tmp = [], view = (c, o) => { const v = orientedView(c, o, SP); if (v !== c) tmp.push(v); return v; };
+    const res = await rt.recKo(jobs.map(([i, o]) => view(subs[i], o)));
     const ko = new Map(jobs.map(([i, o], k) => [i + "|" + o, res[k]]));
     let orient = ORIENTS[0], bestSum = -1;
-    for (const o of ORIENTS) { let s = 0; for (let i = 0; i < nO; i++) { const r = ko.get(i + "|" + o); if (r[0].trim()) s += r[1] * cand[i].line; } if (s > bestSum) { bestSum = s; orient = o; } }
+    for (const o of ORIENTS) { let s = 0; for (let i = 0; i < nO; i++) { const r = ko.get(i + "|" + o); s += r[1] * r[1] * SP.normalize(r[0]).length * cand[i].line; } if (s > bestSum) { bestSum = s; orient = o; } }
     let calls = 1 + res.length;
     const rest = []; for (let i = nO; i < cand.length; i++) rest.push(i);
-    if (rest.length) { const rr = await rt.recKo(rest.map((i) => orientedView(subs[i], orient, SP))); rest.forEach((i, k) => ko.set(i + "|" + orient, rr[k])); calls += rest.length; }
+    if (rest.length) { const rr = await rt.recKo(rest.map((i) => view(subs[i], orient))); rest.forEach((i, k) => ko.set(i + "|" + orient, rr[k])); calls += rest.length; }
     const enJobs = cand.map((_, i) => i).filter((i) => ["en", "mix"].includes(scriptOf(ko.get(i + "|" + orient)[0])));
     const en = new Map();
-    if (enJobs.length) { const er = await rt.recEn(enJobs.map((i) => orientedView(subs[i], orient, SP))); enJobs.forEach((i, k) => en.set(i, er[k])); calls += enJobs.length; }
+    if (enJobs.length) { const er = await rt.recEn(enJobs.map((i) => view(subs[i], orient))); enJobs.forEach((i, k) => en.set(i, er[k])); calls += enJobs.length; }
     cand.forEach((b, i) => {
       const [kt, ks] = ko.get(i + "|" + orient), sc = scriptOf(kt);
       if (sc === "en") { b.text = clean(en.get(i)[0]); b.conf = en.get(i)[1]; b.lang = "en"; }
@@ -1641,6 +1684,7 @@ const EP = (() => {
       b.size = b.text ? Math.sqrt(b.rw * b.rh / Math.max(1, SP.normalize(b.text).length)) : 0;
       b.upright = orientPoints(b.poly, orient, W, H);
     });
+    free(...tmp, ...subs);
     const read = cand.filter((b) => b.text);
     let title = [];
     if (read.length) {
@@ -1666,7 +1710,7 @@ const EP = (() => {
   }
 
   // 사진 한 장: Step 1 → 책마다 E
-  async function runE(img, matcher, rt, SP, onProgress) {
+  async function runE(img, matcher, rt, SP, onProgress, hi) {
     const t0 = performance.now();
     onProgress && onProgress(0, "Step 1: 책 검출 중"); await new Promise((r) => setTimeout(r, 0));
     const { books: found, stages } = await detectBooks(img, rt);
@@ -1675,10 +1719,11 @@ const EP = (() => {
       const bk = found[i];
       onProgress && onProgress(0.15 + 0.85 * i / Math.max(1, found.length), `Step 2: 제목 읽는 중 ${i + 1}/${found.length}`);
       lastYield = 0; await breathe();
-      const { crop, tf } = cropBook(img, bk);
+      const { crop, tf } = cropBook(img, bk, hi);
       let r;
       if (bk.spiral) r = { title: null, raw: "", score: 0, view: "스프링 제본", calls: 0, noText: true, top1: "", textBoxes: [], final: "Unknown", source: "스프링 노트" };
       else r = await readTitleE(crop, bk.kind, matcher, rt, SP);
+      free(crop);
       r.textBoxes = r.textBoxes.map((b) => ({ ...b, poly: b.poly.map(tf) }));
       books.push({ ...bk, ...r });
     }
@@ -1697,6 +1742,7 @@ const ER = (() => {
   function make({ ort, mk, spineSess, coverSess, unifiedSess, det, ko, en }) {
     // det/ko/en: { run(shapeU32, Float32Array) -> {data, shape} } , ko/en 은 dict 포함
     const getData = (cv) => cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data;
+    const free = (c) => { c.width = 0; c.height = 0; };   // 입력을 뽑은 임시 캔버스는 바로 비움
 
     // ---- 검출기 입력 (letterbox, RGB 0~1). rect=true면 ultralytics auto 모드처럼 짧은 변을 32 배수까지만 채움
     function letterbox(img, S, rect) {
@@ -1704,7 +1750,7 @@ const ER = (() => {
       const CW = rect ? Math.ceil(w / 32) * 32 : S, CH = rect ? Math.ceil(h / 32) * 32 : S;
       const px = Math.floor((CW - w) / 2), py = Math.floor((CH - h) / 2), c = mk(CW, CH), g = c.getContext("2d");
       g.fillStyle = "rgb(114,114,114)"; g.fillRect(0, 0, CW, CH); g.drawImage(img, px, py, w, h);
-      const d = getData(c), n = CW * CH, f = new Float32Array(3 * n);
+      const d = getData(c), n = CW * CH, f = new Float32Array(3 * n); free(c);
       for (let i = 0; i < n; i++) { f[i] = d[i * 4] / 255; f[n + i] = d[i * 4 + 1] / 255; f[2 * n + i] = d[i * 4 + 2] / 255; }
       return { t: new ort.Tensor("float32", f, [1, 3, CH, CW]), r, px, py };
     }
@@ -1735,8 +1781,14 @@ const ER = (() => {
     }
 
     // ---- 통합 검출기 (책등·표지 2클래스 YOLO11n-OBB): 출력 [1, 4+2+1, N] = cx, cy, w, h, 책등 점수, 표지 점수, 각도
-    async function unified(img, cfg) {
-      const m = letterbox(img, cfg.imgsz, false), o = await unifiedSess.run({ images: m.t }), out = o[unifiedSess.outputNames[0]];
+    async function unified(img, cfg, pad = 0) {
+      let src = img, ox = 0, oy = 0;
+      if (pad) {   // 사진 둘레에 회색 여백
+        ox = Math.round(img.width * pad); oy = Math.round(img.height * pad);
+        src = mk(img.width + 2 * ox, img.height + 2 * oy); const g = src.getContext("2d"); g.fillStyle = "rgb(114,114,114)"; g.fillRect(0, 0, src.width, src.height); g.drawImage(img, ox, oy);
+      }
+      const m = letterbox(src, cfg.imgsz, false); if (pad) free(src);
+      const o = await unifiedSess.run({ images: m.t }), out = o[unifiedSess.outputNames[0]];
       const N = out.dims[2], NC = out.dims[1] - 5, a = out.data, bs = [];
       for (let i = 0; i < N; i++) {
         let bi = 0, bv = -1; for (let c = 0; c < NC; c++) { const v = a[(4 + c) * N + i]; if (v > bv) { bv = v; bi = c; } }
@@ -1746,7 +1798,7 @@ const ER = (() => {
       bs.sort((x, y) => y.score - x.score);
       const keep = [];   // 클래스별 회전 NMS (ultralytics 기본: agnostic=False)
       for (let i = 0; i < bs.length && keep.length < 300; i++) { let ok = true; for (const k of keep) if (k.cls === bs[i].cls && probiou(k, bs[i]) >= cfg.iou) { ok = false; break; } if (ok) keep.push(bs[i]); }
-      return keep.map((b) => ({ cx: (b.cx - m.px) / m.r, cy: (b.cy - m.py) / m.r, w: b.w / m.r, h: b.h / m.r, ang: b.ang, score: b.score, kind: b.cls === 1 ? "cover" : "spine" }));
+      return keep.map((b) => ({ cx: (b.cx - m.px) / m.r - ox, cy: (b.cy - m.py) / m.r - oy, w: b.w / m.r, h: b.h / m.r, ang: b.ang, score: b.score, kind: b.cls === 1 ? "cover" : "spine" }));
     }
 
     // ---- 표지 후보: COCO 'book'(73)이 최고 클래스인 상자만, NMS IoU 0.7 (ultralytics 기본)
@@ -1783,7 +1835,7 @@ const ER = (() => {
       const h = cv.height, w = cv.width, ratio = Math.max(h, w) > 960 ? 960 / Math.max(h, w) : 1;
       const RH = Math.max(Math.round(Math.trunc(h * ratio) / 32) * 32, 32), RW = Math.max(Math.round(Math.trunc(w * ratio) / 32) * 32, 32);
       const c = mk(RW, RH), g = c.getContext("2d"); g.drawImage(cv, 0, 0, RW, RH);
-      const d = getData(c), n = RW * RH, f = new Float32Array(3 * n), mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225];
+      const d = getData(c), n = RW * RH, f = new Float32Array(3 * n), mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225]; free(c);
       for (let i = 0; i < n; i++) { const bgr = [d[i * 4 + 2], d[i * 4 + 1], d[i * 4]]; for (let k = 0; k < 3; k++) f[k * n + i] = (bgr[k] / 255 - mean[k]) / std[k]; }
       const o = det.run(new Uint32Array([1, 3, RH, RW]), f), P = o.data, Hm = o.shape[2], Wm = o.shape[3];
       const lab = new Int32Array(Hm * Wm).fill(-1), polys = [];
@@ -1827,7 +1879,8 @@ const ER = (() => {
       const d = getData(cv), vals = []; for (let i = 0; i < d.length; i += 4 * 7) vals.push(d[i], d[i + 1], d[i + 2]);
       vals.sort((a, b) => a - b); const med = vals[vals.length >> 1] | 0;
       const sq = mk(side, side), g = sq.getContext("2d"); g.fillStyle = `rgb(${med},${med},${med})`; g.fillRect(0, 0, side, side); g.drawImage(cv, ox, oy);
-      return detOnce(sq).map((p) => p.map(([x, y]) => [Math.min(w - 1, Math.max(0, x - ox)), Math.min(h - 1, Math.max(0, y - oy))]));
+      const out = detOnce(sq); free(sq);
+      return out.map((p) => p.map(([x, y]) => [Math.min(w - 1, Math.max(0, x - ox)), Math.min(h - 1, Math.max(0, y - oy))]));
     }
 
     // ---- PP-OCRv5 인식 (높이 48, 폭 최소 320으로 0 채움, BGR, (x/255-0.5)/0.5) + CTC 디코딩(신뢰도 = 글자 확률 평균)
@@ -1835,7 +1888,7 @@ const ER = (() => {
       if (cv.width < 8 || cv.height < 8) return ["", 0];
       const H = 48, ratio = cv.width / cv.height, Wt = Math.max(320, Math.floor(H * Math.max(320 / 48, ratio))), rw = Math.min(Wt, Math.ceil(H * ratio));
       const c = mk(rw, H), g = c.getContext("2d"); g.drawImage(cv, 0, 0, rw, H);
-      const d = getData(c), f = new Float32Array(3 * H * Wt), n = H * Wt;
+      const d = getData(c), f = new Float32Array(3 * H * Wt), n = H * Wt; free(c);
       for (let y = 0; y < H; y++) for (let x = 0; x < rw; x++) { const i = (y * rw + x) * 4, j = y * Wt + x; f[j] = (d[i + 2] / 255 - 0.5) / 0.5; f[n + j] = (d[i + 1] / 255 - 0.5) / 0.5; f[2 * n + j] = (d[i] / 255 - 0.5) / 0.5; }
       const o = model.run(new Uint32Array([1, 3, H, Wt]), f), T = o.shape[1], C = o.shape[2], p = o.data;
       let s = "", prev = -1, ps = 0, pn = 0;
@@ -2045,13 +2098,9 @@ if (typeof module !== "undefined") module.exports = ER;
       ort.env.wasm.wasmPaths = { mjs: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/ort-wasm-simd-threaded.mjs" };
       ort.env.wasm.wasmBinary = await fetchBuf("ort-wasm-simd-threaded.wasm");
       charset = (await (await fetch("charset.txt")).text()).split("\n");
-      recSamples = await (await fetch("rec_samples.json")).json();
-      const raw = await fetchB64("rec_inputs.f32.b64.txt");
-      recInputs = new Float32Array(raw.buffer, raw.byteOffset, raw.byteLength / 4);
-      sampleImgs = [await loadImg("shelf_001.jpg"), await loadImg("shelf_003.jpg")];
       matcher = new SP.Matcher(await (await fetch("catalog.json")).json());
       ignoreSet = new Set(await (await fetch("ignore_idx.json")).json());
-      for (const m of MODELS) { $("st").textContent = m.label + " 불러오는 중"; bytes[m.key] = await fetchB64(m.file + ".b64.txt"); }
+      // 처리 시간 측정용 모델·샘플(약 30MB)은 미리 받지 않음: 측정 시작이나 다른 모델 탭을 누를 때 받는다 (휴대폰 메모리 절약)
       $("rtstate").textContent = "준비됨"; $("rtdot").classList.add("ready"); $("st").textContent = "준비됐습니다. 화면을 켠 채로 측정 시작을 누르세요.";
       $("run").disabled = false;
     } catch (e) {
@@ -2161,9 +2210,29 @@ if (typeof module !== "undefined") module.exports = ER;
 
   async function session(key) {
     if (sessions[key]) return { s: sessions[key], load: 0 };
+    if (!bytes[key]) bytes[key] = await fetchB64(MODELS.find((m) => m.key === key).file + ".b64.txt");
     const t = performance.now();
-    sessions[key] = await ort.InferenceSession.create(bytes[key], { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
+    sessions[key] = await createSession(bytes[key]);
     return { s: sessions[key], load: performance.now() - t };
+  }
+  async function ensureBench() {
+    if (recInputs) return;
+    recSamples = await (await fetch("rec_samples.json")).json();
+    const raw = await fetchB64("rec_inputs.f32.b64.txt");
+    recInputs = new Float32Array(raw.buffer, raw.byteOffset, raw.byteLength / 4);
+    sampleImgs = [await loadImg("shelf_001.jpg"), await loadImg("shelf_003.jpg")];
+  }
+  // ONNX Runtime 세션: 메모리 미리 잡기(arena·mem pattern)를 꺼 WASM 메모리 최고치를 낮춤 (WASM 메모리는 한 번 늘면 줄지 않음)
+  const SESS_OPTS = { executionProviders: ["wasm"], graphOptimizationLevel: "all", enableCpuMemArena: false, enableMemPattern: false };
+  const isOOM = (e) => /out of memory|memory access out of bounds|allocation|RangeError/i.test(String(e && e.message || e));
+  async function createSession(buf, opts = SESS_OPTS) {
+    try { return await ort.InferenceSession.create(buf, opts); }
+    catch (e) {   // 메모리 부족이면 잠깐 쉬어 브라우저가 메모리를 정리할 틈을 준 뒤 한 번 더
+      if (!isOOM(e)) throw e;
+      logError("모델 불러오기 (메모리 부족 → 다시 시도)", e);
+      await new Promise((r) => setTimeout(r, 800));
+      return await ort.InferenceSession.create(buf, opts);
+    }
   }
 
   // 검출기 입력: 레터박스 후 RGB 0~1, CHW
@@ -2246,6 +2315,7 @@ if (typeof module !== "undefined") module.exports = ER;
     let wake = null; try { wake = await navigator.wakeLock?.request("screen"); } catch (_) {}
     showProgress("처리 시간을 측정 중입니다.\n잠시만 기다려주세요.");
     try {
+      setProgress(0, "측정용 모델·샘플 불러오는 중"); await ensureBench();
       let step = 0;
       for (const m of MODELS.filter((x) => x.kind === "det")) {
         $("st").textContent = m.label + " 측정 중"; setProgress(step * 0.15, m.label + " 측정 중"); step++;
@@ -2354,20 +2424,27 @@ if (typeof module !== "undefined") module.exports = ER;
   let ERT = null, coverErr = "";
   async function ensureE(step) {
     if (ERT) return ERT;
-    await ensurePP(); EP.init(mk);
+    EP.init(mk);
     try { EP.setNonTitles((await (await fetch("non_titles.txt")).text()).split("\n"), SP); } catch (e) { logError("제목 아님 목록", e); }
-    let unifiedSess = null, spineSess = null, coverSess = null;
-    step("통합 책 검출기 확인 중");
-    try { unifiedSess = await ort.InferenceSession.create(await fetchBuf("e_unified.onnx"), { executionProviders: ["wasm"], graphOptimizationLevel: "all" }); }
-    catch (e) { unifiedSess = null; }   // 없으면 기존 방식(책등 모델 + 표지 모델 + 규칙)
-    if (unifiedSess) { logLine("Step 1: 통합 검출기(YOLO11n-OBB 책등·표지, 모든 방향) 사용"); }
-    else {
+    let unifiedSess = null, spineSess = null, coverSess = null, ubuf = null;
+    // 통합 검출기를 가장 먼저 불러옴: ONNX Runtime WASM은 다른 모델이 메모리를 차지하기 전에 시작해야 메모리 부족이 덜 남
+    step("통합 책 검출기 불러오는 중");
+    try { ubuf = await fetchBuf("e_unified.onnx"); } catch (e) { ubuf = null; }   // 파일이 없을 때만 기존 방식(책등 모델 + 표지 모델 + 규칙)
+    if (ubuf) {
+      try { const m = await (await fetch("e_unified.json", { cache: "no-cache" })).json(); for (const k of ["imgsz", "conf", "zoom", "inside"]) if (k in m) EP.CFG.unified[k] = m[k]; } catch (_) {}
+      try { unifiedSess = await createSession(ubuf); }
+      catch (e) { throw new Error(isOOM(e) ? "휴대폰 메모리가 부족해 모델을 불러오지 못했습니다. 다른 앱·탭을 닫고 페이지를 새로고침한 뒤 다시 시도해 주세요" : e && e.message ? e.message : String(e)); }
+      ubuf = null;
+      logLine(`Step 1: 통합 검출기(YOLO11n-OBB 책등·표지, 모든 방향, 입력 ${EP.CFG.unified.imgsz}) 사용`);
+    } else {
     step("책등 검출기 불러오는 중");
-    spineSess = await ort.InferenceSession.create(await fetchB64("e_spine960.onnx.b64.txt"), { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
+    spineSess = await createSession(await fetchB64("e_spine960.onnx.b64.txt"));
     step("표지 검출기 불러오는 중 (58MB, 처음 한 번)");
-    try { coverSess = await ort.InferenceSession.create(await fetchParts(["e_cover.part1.b64.txt", "e_cover.part2.b64.txt", "e_cover.part3.b64.txt", "e_cover.part4.b64.txt", "e_cover.part5.b64.txt", "e_cover.part6.b64.txt"]), { executionProviders: ["wasm"], graphOptimizationLevel: "basic" }); }
+    try { coverSess = await createSession(await fetchParts(["e_cover.part1.b64.txt", "e_cover.part2.b64.txt", "e_cover.part3.b64.txt", "e_cover.part4.b64.txt", "e_cover.part5.b64.txt", "e_cover.part6.b64.txt"]), { ...SESS_OPTS, graphOptimizationLevel: "basic" }); }
     catch (e) { coverErr = "표지 검출기를 불러오지 못해 책등만 검출했습니다 (" + (e && e.message ? e.message : e) + ")"; logError("표지 검출기 불러오기", e); }
     }
+    step("한국어 인식 모델 불러오는 중");
+    await ensurePP();
     step("글자 검출·영어 인식 모델 불러오는 중");
     const det = rtenModel(await fetchB64("e_det.rten.b64.txt"));
     const en = rtenModel(await fetchB64("e_en_rec.rten.b64.txt"), await fetchDict("e_en_dict.txt"));
@@ -2378,7 +2455,7 @@ if (typeof module !== "undefined") module.exports = ER;
   async function computeE(img, p0, p1) {
     const span = p1 - p0, step = (t) => setProgress(p0 + span * 0.02, `최종모델(E): ${t}`);
     const rt = await ensureE(step);
-    const R = await EP.runE(img, matcher, rt, SP, (f, t) => setProgress(p0 + span * (0.05 + 0.95 * f), `최종모델(E): ${t}`));
+    const R = await EP.runE(img, matcher, rt, SP, (f, t) => setProgress(p0 + span * (0.05 + 0.95 * f), `최종모델(E): ${t}`), AB.src);
     setProgress(p1, "최종모델(E): 완료");
     logLine(`E 결과: ${R.books.length}권 · Step 1 ${(R.tDet / 1000).toFixed(1)}초 · 전체 ${(R.tAll / 1000).toFixed(1)}초 · 인식 호출 ${R.calls}회` + (rt.coverFail ? " · " + rt.coverFail : ""));
     const rows = R.books.map((b) => ({ title: b.final !== "Unknown" ? b.final : null, src: b.source, kind: b.kind, noText: b.noText, spiral: b.source === "스프링 노트", raw: b.raw || "", view: b.view }));
@@ -2561,7 +2638,7 @@ if (typeof module !== "undefined") module.exports = ER;
       // 큰 휴대폰 사진은 긴 변 1600px로 줄여 처리 (원본 해상도 크롭은 정확도 이득이 없음을 실험으로 확인)
       const iw = src.naturalWidth || src.width, ih = src.naturalHeight || src.height, k = Math.min(1, 1600 / Math.max(iw, ih));
       const img = mk(Math.round(iw * k), Math.round(ih * k)); img.getContext("2d").drawImage(src, 0, 0, img.width, img.height);
-      AB.img = img;
+      AB.img = img; AB.src = src;   // src: 원본 사진 (글자 읽기용 크롭)
       AB.filter = "all";
       AB.E = await computeE(img, 0, 1);
       $("abWrap").hidden = false; $("cv").hidden = false; AB.eView = 3; renderModel("E");
@@ -2581,7 +2658,7 @@ if (typeof module !== "undefined") module.exports = ER;
   });
   function reset1() {
     if (busy) return;
-    AB.A = AB.B = AB.D = AB.E = AB.img = null; AB.view = "E"; AB.eView = 3;
+    AB.A = AB.B = AB.D = AB.E = AB.img = AB.src = null; AB.view = "E"; AB.eView = 3;
     for (const [j, w] of [["ev1", 1], ["ev2", 2], ["ev3", 3]]) { $(j).classList.toggle("on", w === 3); $(j).setAttribute("aria-selected", String(w === 3)); }
     $("eViews").hidden = true; $("cvCap").hidden = true; $("cvLeg").hidden = true;
     $("abWrap").hidden = true; $("cv").hidden = true; $("res").hidden = true; $("rList").innerHTML = ""; $("cmp").innerHTML = ""; $("dst").hidden = false;

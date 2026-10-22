@@ -18,12 +18,14 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--epochs", type=int, default=40); ap.add_argument("--imgsz", type=int, default=768)
 ap.add_argument("--batch", type=int, default=8); ap.add_argument("--fraction", type=float, default=1.0)
 ap.add_argument("--device", default="mps")
+ap.add_argument("--weights", default=str(ROOT / "models" / "yolo11n-obb.pt"), help="시작 가중치 (기본: DOTA 사전학습 yolo11n-obb)")
+ap.add_argument("--mosaic", type=float, default=0.3)
 a = ap.parse_args()
 
-m = YOLO(str(ROOT / "models" / "yolo11n-obb.pt"))          # DOTA 사전학습 OBB → 책등/표지 2클래스로 미세조정
+m = YOLO(a.weights)          # DOTA 사전학습 OBB(또는 이전 학습 결과) → 책등/표지 2클래스로 미세조정
 r = m.train(data=str(ROOT / "datasets" / "books_obb" / "data.yaml"), epochs=a.epochs, imgsz=a.imgsz, batch=a.batch,
             fraction=a.fraction, device=a.device, workers=0, patience=12,
-            degrees=180, flipud=0.5, fliplr=0.5, mosaic=0.7, scale=0.6, translate=0.1, hsv_v=0.5,
+            degrees=180, flipud=0.5, fliplr=0.5, mosaic=a.mosaic, scale=0.6, translate=0.1, hsv_v=0.5,
             project=str(ROOT / "outputs" / "train"), name="books_obb", exist_ok=True)
 best = ROOT / "outputs" / "train" / "books_obb" / "weights" / "best.pt"
 shutil.copy(best, ROOT / "models" / "books_obb_best.pt")
