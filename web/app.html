@@ -75,7 +75,7 @@ canvas { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--
 .tabs4 .tab:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
 .tabs4 .tab.beta { grid-column: 1 / -1; border-top: 1px solid var(--line); }
 .spec .st { display: inline-block; font-size: .7rem; font-weight: 700; border-radius: 4px; padding: 0 5px; margin-right: 6px; }
-.spec .st.ok { background: #e3f4ea; color: #1f7a4d; } .spec .st.todo { background: #fff4dc; color: #9a6700; } .spec .st.hard { background: #fde8e8; color: #b42318; }
+.spec .st.ok { background: #e3f4ea; color: #1f7a4d; } .spec .st.todo { background: #fff4dc; color: #9a6700; } .spec .st.hard { background: #fde8e8; color: #b42318; } .spec .st.sub { background: #e8eefc; color: #1f4fb4; }
 .spec .note2 { grid-column: 1 / -1; margin-top: 6px; color: var(--sub); line-height: 1.5; }
 .eviews .tab { font-size: .8rem; }
 .cvcap { font-size: .8rem; color: var(--sub); margin: 6px 0 0; }
@@ -192,7 +192,7 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
         <button type="button" role="tab" id="tabB" class="tab" aria-selected="false">개선모델(B)</button>
         <button type="button" role="tab" id="tabD" class="tab" aria-selected="false">PaddleOCR(D)</button>
         <button type="button" role="tab" id="tabE" class="tab on" aria-selected="true">최종모델(E)</button>
-        <button type="button" role="tab" id="tabL" class="tab beta" aria-selected="false">Liber(β) · 다음 단계</button>
+        <button type="button" role="tab" id="tabL" class="tab beta" aria-selected="false">Liber(β1) · Liber-lite</button>
       </div>
       <dl class="spec" id="spec"></dl>
       <div class="cmp" id="cmp"></div>
@@ -930,7 +930,7 @@ const DEVICES = [
 ].map(([group, name, chip, ram, year, reported]) => ({ group, name, chip, ram, year, reported: !!reported }));
 
 // 앱 버전: 최종 제출 전까지 0.x 유지, 패치마다 0.10 → 0.11 → 0.12 … 로 하나씩 올림
-const APP_VERSION = "0.12", APP_UPDATED = "2026-10-23 00:50 (KST)";
+const APP_VERSION = "0.13", APP_UPDATED = "2026-10-23 00:56 (KST)";
 
 // 최종모델(E) 용량 · 메모리 (MB). 검출기는 직접 학습한 YOLO11n-OBB (책등·표지 2클래스, 40에포크)
 const MODEL_INFO = {
@@ -1736,7 +1736,7 @@ const EP = (() => {
   }
 
   function init(mkFn) { mk = mkFn; }
-  return { CFG, init, runE, setNonTitles, stripNonTitle, detectBooks, readTitleE, minAreaRect, bboxOf, spiralScore, fuseBoxes, ACCEPT };
+  return { CFG, init, runE, setNonTitles, stripNonTitle, detectBooks, readTitleE, minAreaRect, bboxOf, spiralScore, fuseBoxes, cropBook, freeCanvas: free, ACCEPT };
 })();
 if (typeof module !== "undefined") module.exports = EP;
 
@@ -2403,7 +2403,7 @@ if (typeof module !== "undefined") module.exports = ER;
          desc: "검출기 INT8(3.2MB) + 원거리 촬영 시 1280 재검출 · 조기 종료 · 권차·점수 차·포함 관계 검증 · 글자 없는 책등 판별" },
     D: { label: "PaddleOCR(D)", det: "det640_int8", size: 640, adaptive: true, rec: "pp5", opts: { clahe: false, early: true, verify: true, noText: true, prep: (im) => ppPrep(im) } },
     E: { label: "최종모델(E)" },
-    L: { label: "Liber(β)" },
+    L: { label: "Liber(β1)" },
   };
   // 탭마다 적용된 모델 구성 (인식 후 표시)
   const SPEC = {
@@ -2419,30 +2419,187 @@ if (typeof module !== "undefined") module.exports = ER;
         ["실행 엔진", "ONNX Runtime Web(검출) + rten(PaddleOCR) · WASM"],
         ["PC와 다른 점", "표지 검출 1회(PC 6회) · 글자 방향은 굵은 글자 상자 2개로 판단(PC 6개)"]],
   };
-  // Liber(β): PC 노트북(liber_deprehensus.ipynb)에서 전체 흐름을 검증한 9단계 모델. 휴대폰 이식 준비 상태를 보여 줌
-  const LIBER_ST = { ok: "준비됨", todo: "변환·이식 필요", hard: "검토 필요" };
+  // ---- Liber(β1 · Liber-lite): PC 노트북(liber_deprehensus.ipynb)에서 검증한 Liber의 글자 쪽 단계를 새 모델 없이 옮긴 것
+  //  ① 책 검출은 최종모델(E)의 통합 검출기, ⑧ 글자 인식은 TrOCR 대신 PP-OCRv5를 빌려 쓰고
+  //  ⑥ 줄마다 방향(90°·180°·세로쓰기) 선택 · ⑦ 회전 사각형 펴기 + 여백 + CLAHE · ⑨ 규칙 + 글자 5-gram 교정 + 카탈로그 매칭은 Liber 그대로
+  const LIBER_ST = { ok: "β1 적용", sub: "대체 사용", todo: "β2 예정", hard: "β3 검토" };
   const LIBER_SPEC = [
-    ["① 책 검출", "YOLO11n-OBB (Liber 자체 학습)", "todo", "ONNX 변환 쉬움(INT8 약 3MB) · 정식 학습 후 적용"],
-    ["② 가짜 책 필터", "SAM 2.1 tiny", "hard", "인코더 ONNX 약 40MB(INT8) · 사진당 인코더 1회가 수 초로 예상"],
-    ["③ 권수 확정", "ViT 4종 분류", "todo", "DeiT-Small 약 22MB 가능 · ViT-Large(약 300MB)는 휴대폰에 과함"],
-    ["④ 업스케일", "FSRCNN", "todo", "약 40KB · ONNX 변환만 필요"],
-    ["⑤ 글자 검출", "PP-OCRv5 det", "ok", "최종모델(E)에서 사용 중 (4.9MB)"],
-    ["⑥ 언어·방향", "PP-OCRv5 rec", "ok", "최종모델(E)에서 사용 중 · 세로쓰기 펼침 규칙만 이식"],
-    ["⑦ ROI 정렬", "원근 변환 + CLAHE", "todo", "학습 없는 계산 · JS로 구현"],
-    ["⑧ 글자 인식", "TrOCR 한국어·영어", "hard", "각 약 60MB(INT8) · 글자 생성 반복을 JS로 구현 · 제목 줄만 읽도록 순서 변경 필요"],
-    ["⑨ 제목 확정", "규칙 + 글자 5-gram + 카탈로그", "todo", "학습 없는 계산 · 카탈로그 매칭은 E에 이미 있음"],
+    ["① 책 검출", "YOLO11n-OBB", "sub", "최종모델(E)의 통합 검출기로 대체 · Liber 검출기는 정식 학습 후(β2)"],
+    ["② 가짜 책 필터", "SAM 2.1 tiny", "hard", "휴대폰 속도·메모리 실측 후 결정 · 지금은 건너뜀"],
+    ["③ 권수 확정", "ViT 4종 분류", "todo", "DeiT-Small(약 22MB) · 지금은 검출 결과를 그대로 권수로 사용"],
+    ["④ 업스케일", "FSRCNN", "todo", "약 40KB · 지금은 원본 해상도에서 자름"],
+    ["⑤ 글자 검출", "PP-OCRv5 det", "ok", "최종모델(E)과 같은 모델 (4.9MB)"],
+    ["⑥ 언어·방향", "PP-OCRv5 rec", "ok", "줄마다 방향 후보(90°·180°·세로쓰기) 중 인식 점수가 가장 높은 것"],
+    ["⑦ ROI 정렬", "회전 펴기 + CLAHE", "ok", "줄 사각형을 바로 펴고 여백 15% · 대비 보정 (JS)"],
+    ["⑧ 글자 인식", "TrOCR 한국어·영어", "sub", "PP-OCRv5 한국어·영어 인식기로 대체 · TrOCR(각 약 60MB)는 β3에서 검토"],
+    ["⑨ 제목 확정", "규칙 + 글자 5-gram + 카탈로그", "ok", "저자·판수·잘린 줄 제외 → 단어 교정·어순 → 카탈로그 확정 (모두 비신경망)"],
   ];
-  function renderLiber() {
-    AB.view = "L";
-    for (const k of ["A", "B", "D", "E", "L"]) { const t = $("tab" + k); t.classList.toggle("on", k === "L"); t.setAttribute("aria-selected", String(k === "L")); }
-    for (const id of ["cv", "cvCap", "cvLeg", "eViews", "res"]) $(id).hidden = true;
-    $("cmp").innerHTML = "";
-    $("spec").innerHTML = `<dt class="h">Liber(β) · 모델 아키텍처와 9단계 휴대폰 이식 상태</dt>` +
-      LIBER_SPEC.map(([b, m, st, note]) => `<dt>${b}</dt><dd><span class="st ${st}">${LIBER_ST[st]}</span>${m}<br><small>${note}</small></dd>`).join("") +
+  function liberSpecHtml() {
+    return `<dt class="h">Liber(β1 · Liber-lite) 적용 모델</dt>` +
       `<dd class="note2"><img src="liber_arch.png" alt="Liber 모델 아키텍처" style="display:block;width:100%;max-width:560px;margin:4px auto 8px;border:1px solid var(--line);border-radius:8px;background:#fff"></dd>` +
-      `<dd class="note2">Liber는 PC에서 사진 → 권수 → 제목까지 전체 흐름 검증을 마친 베타입니다. 휴대폰에는 단계별로 옮기는 중이라, 지금은 이 사진을 Liber로 인식하지 않습니다. 인식 결과는 최종모델(E) 탭에서 볼 수 있습니다.</dd>`;
+      LIBER_SPEC.map(([b, m, st, note]) => `<dt>${b}</dt><dd><span class="st ${st}">${LIBER_ST[st]}</span>${m}<br><small>${note}</small></dd>`).join("") +
+      `<dd class="note2">β1은 새 모델을 받지 않습니다. 책 검출과 글자 인식은 최종모델(E)의 모델을 빌려 쓰고, Liber에서 새로 만든 줄 단위 방향·세로쓰기 판별, 글자 줄 정렬, 비신경망 제목 교정을 적용합니다. ②③④는 β2·β3에서 추가합니다.</dd>`;
   }
-  const AB = { A: null, B: null, D: null, E: null, img: null, view: "E", eView: 3 };
+
+  const LIB = {
+    R: { maxLines: 8, vertical: 1.3, pad: 0.15, minConf: 0.5, sizeRatio: 0.6, maxTitle: 4, edge: 0.02, match: 75,
+         n: 5, maxEdit: 2, editRatio: 0.25, minJamo: 5, errW: 4.0, beam: 8, cands: 5, orderMargin: 0.1 },
+    lex: null,
+  };
+  const LIB_AUTHOR = /(지음|지은이|옮김|공역|편역|편저|감수|역|저|著)\s*$|^[가-힣]{2,4}\s*[·•+∙,]\s*[가-힣]{2,4}|[《〈(\[]\s*(공?역|공?저|편|감수|옮김)\s*[》〉)\]]|^.{0,3}수\s*:/;
+  const LIB_EDITION = /^(제?\s*\d+\s*판|개정\s*\d*\s*판|전면\s*개정판|\d+(st|nd|rd|th)?\s*edition|edition)$/i;
+  const libClean = (t) => t.trim().replace(/\s+/g, " ").replace(/^[^0-9A-Za-z가-힣]+|[^0-9A-Za-z가-힣]+$/g, "");
+
+  // 글자 n-gram 언어모델 (보간 Kneser-Ney). 카탈로그 제목에서 글자 배열의 자연스러움을 센다 (노트북 Cell 9-2와 같은 식)
+  class CharKN {
+    constructor(texts, n = 5, d = 0.75) {
+      this.n = n; this.d = d; this.cnt = []; const top = new Map();
+      for (const t of texts) { const s = "^".repeat(n - 1) + t + "$"; for (let i = n - 1; i < s.length; i++) { const g = s.slice(i - n + 1, i + 1); top.set(g, (top.get(g) || 0) + 1); } }
+      this.cnt[n] = top;
+      for (let k = n - 1; k >= 1; k--) { const m = new Map(); for (const g of this.cnt[k + 1].keys()) { const h = g.slice(1); m.set(h, (m.get(h) || 0) + 1); } this.cnt[k] = m; }
+      this.tot = []; this.typ = [];
+      for (let k = 1; k <= n; k++) {
+        const tot = new Map(), typ = new Map();
+        for (const [g, v] of this.cnt[k]) { const c = g.slice(0, -1); tot.set(c, (tot.get(c) || 0) + v); typ.set(c, (typ.get(c) || 0) + 1); }
+        this.tot[k] = tot; this.typ[k] = typ;
+      }
+      this.V = this.cnt[1].size + 1;
+    }
+    prob(h, w) {
+      let p = 1 / this.V;
+      for (let k = 1; k <= this.n; k++) {
+        const ctx = k > 1 ? h.slice(h.length - (k - 1)) : "", ch = this.tot[k].get(ctx) || 0;
+        if (ch) p = Math.max((this.cnt[k].get(ctx + w) || 0) - this.d, 0) / ch + this.d * this.typ[k].get(ctx) / ch * p;
+      }
+      return p;
+    }
+    logprob(t) { const n = this.n, s = "^".repeat(n - 1) + t + "$"; let lp = 0; for (let i = n - 1; i < s.length; i++) lp += Math.log(this.prob(s.slice(i - n + 1, i), s[i])); return lp; }
+    perChar(t) { return this.logprob(t) / (t.length + 1); }
+  }
+  function lev(a, b) {
+    if (a === b) return 0; let prev = Array.from({ length: b.length + 1 }, (_, j) => j), cur = new Array(b.length + 1);
+    for (let i = 1; i <= a.length; i++) { cur[0] = i; for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); [prev, cur] = [cur, prev]; }
+    return prev[b.length];
+  }
+  function libLex() {
+    if (LIB.lex) return LIB.lex;
+    const key = (t) => t.toLowerCase().replace(/\s+/g, " ").trim(), titles = matcher.titles;
+    const vocab = new Map(); for (const t of titles) for (const w of t.split(/\s+/)) if (w && !vocab.has(w.toLowerCase())) vocab.set(w.toLowerCase(), w);
+    return (LIB.lex = { key, lm: new CharKN(titles.map(key), LIB.R.n), vocab, vj: [...vocab.keys()].map((k) => [k, SP.toJamo(k)]) });
+  }
+  // 단어 후보: [원래 단어 + 사전에서 자모 편집거리 ≤ 허용치인 단어]. 숫자·기호만 있는 단어와 짧은 단어는 고치지 않음
+  function libWordOptions(word) {
+    const L = libLex(), R = LIB.R, k = word.toLowerCase();
+    if (L.vocab.has(k)) return [[L.vocab.get(k), 0]];
+    const j = SP.toJamo(k), maxEd = Math.min(R.maxEdit, Math.floor(j.length * R.editRatio)), opts = [[word, 0]];
+    if (!/[A-Za-z가-힣]/.test(word) || j.length < R.minJamo || !maxEd) return opts;
+    const hits = []; for (const [w, wj] of L.vj) { const d = lev(j, wj); if (d > 0 && d <= maxEd) hits.push([L.vocab.get(w), d]); }
+    return opts.concat(hits.sort((x, y) => x[1] - y[1]).slice(0, R.cands));
+  }
+  // 문장 점수 = 언어모델 로그확률 − errW × 편집거리 합 (잡음 채널), 빔 서치
+  function libCorrectLine(text) {
+    const L = libLex(), R = LIB.R; let beams = [["", 0, 0]];
+    for (const w of text.split(/\s+/).filter(Boolean)) {
+      const nxt = [];
+      for (const [b, e] of beams) for (const [o, d] of libWordOptions(w)) { const t = (b + " " + o).trim(); nxt.push([t, e + d, L.lm.logprob(L.key(t)) - R.errW * (e + d)]); }
+      beams = nxt.sort((x, y) => y[2] - x[2]).slice(0, R.beam);
+    }
+    return beams.length && beams[0][0] ? beams[0][0] : text;
+  }
+  function* libPerms(a) { if (a.length <= 1) { yield a; return; } for (let i = 0; i < a.length; i++) for (const p of libPerms(a.slice(0, i).concat(a.slice(i + 1)))) yield [a[i], ...p]; }
+  function libBestOrder(lines) {
+    if (lines.length < 2 || lines.length > 4) return lines;
+    const L = libLex(), sc = (p) => L.lm.perChar(L.key(p.join(" "))), base = sc(lines);
+    let best = lines, bs = base; for (const p of libPerms(lines)) { const v = sc(p); if (v > bs) { bs = v; best = p; } }
+    return bs - base >= LIB.R.orderMargin ? best : lines;
+  }
+
+  // ⑦ 회전 사각형을 바로 펴서 자름 (긴 변이 가로) + 여백
+  function libRectCrop(src, poly, pad) {
+    const r = EP.minAreaRect(poly), m = pad * Math.min(r.w, r.h), W = Math.max(1, Math.round(r.w + 2 * m)), H = Math.max(1, Math.round(r.h + 2 * m));
+    const c = mk(W, H), g = c.getContext("2d"); g.translate(W / 2, H / 2); g.rotate(-r.ang); g.drawImage(src, -r.cx, -r.cy);
+    return c;
+  }
+  function libRot(cv, k) {   // 1 = 시계 90°, 2 = 180°, 3 = 반시계 90°
+    const c = k % 2 ? mk(cv.height, cv.width) : mk(cv.width, cv.height), g = c.getContext("2d");
+    g.translate(c.width / 2, c.height / 2); g.rotate(k * Math.PI / 2); g.drawImage(cv, -cv.width / 2, -cv.height / 2); return c;
+  }
+  // 세로쓰기(글자가 위→아래로 쌓임) → 글자 칸을 옆으로 이어 붙임. 글자 칸 분할이 안 되면 정사각형 칸으로 자름
+  function libStack(cv) {
+    const rl = SP.relayoutVertical(cv, mk, 1.0); if (rl) return rl;
+    const w = cv.width, h = cv.height, k = Math.max(1, Math.round(h / Math.max(1, w))), c = mk(w * k, w), g = c.getContext("2d");
+    for (let i = 0; i < k; i++) g.drawImage(cv, 0, Math.round(i * h / k), w, Math.round(h / k), i * w, 0, w, w);
+    return c;
+  }
+  function libClahe(cv) {
+    const G = SP.clahe(SP.toGray(cv)), c = mk(G.w, G.h), g = c.getContext("2d"), im = g.createImageData(G.w, G.h);
+    for (let i = 0; i < G.w * G.h; i++) { const v = G.d[i]; im.data[i * 4] = im.data[i * 4 + 1] = im.data[i * 4 + 2] = v; im.data[i * 4 + 3] = 255; }
+    g.putImageData(im, 0, 0); return c;
+  }
+
+  // 책 1권: ⑤ 글자 줄 → ⑦ 펴기·CLAHE → ⑥ 방향 후보 인식 → ⑨ 제목 조립·교정·카탈로그
+  async function libReadBook(crop, rt) {
+    const R = LIB.R, W = crop.width;
+    const lines = (await rt.textDet(crop)).map((p) => ({ p, r: EP.minAreaRect(p) })).filter((x) => Math.min(x.r.w, x.r.h) >= 6)
+      .sort((a, b) => Math.min(b.r.w, b.r.h) - Math.min(a.r.w, a.r.h)).slice(0, R.maxLines);
+    const views = [], owner = [], tmp = [];
+    lines.forEach((L, i) => {
+      const flat = libRectCrop(crop, L.p, R.pad), roi = libClahe(flat); EP.freeCanvas(flat); tmp.push(roi);
+      const cand = roi.height > R.vertical * roi.width ? [["cw", libRot(roi, 1)], ["ccw", libRot(roi, 3)], ["stack", libStack(roi)]] : [["0", roi], ["180", libRot(roi, 2)]];
+      for (const [o, v] of cand) { views.push(v); owner.push([i, o]); if (v !== roi) tmp.push(v); }
+    });
+    const ko = views.length ? await rt.recKo(views) : [], best = lines.map(() => null);
+    ko.forEach((res, k) => { const [i, o] = owner[k]; if (!best[i] || res[1] > best[i].conf) best[i] = { text: res[0], conf: res[1], o, view: views[k] }; });
+    const enIdx = best.map((b, i) => (b && /[A-Za-z]/.test(b.text) && !/[가-힣]/.test(b.text) ? i : -1)).filter((i) => i >= 0);
+    if (enIdx.length) { const er = await rt.recEn(enIdx.map((i) => best[i].view)); enIdx.forEach((i, k) => { best[i].text = er[k][0]; best[i].conf = er[k][1]; }); }
+    let calls = 1 + views.length + enIdx.length;
+    EP.freeCanvas(...tmp);
+
+    const edge = R.edge * W, read = [];
+    lines.forEach((L, i) => {
+      const b = best[i]; if (!b) { L.skip = "인식 없음"; return; }
+      const t = libClean(b.text), xs = L.p.map((q) => q[0]); L.text = t;
+      L.skip = b.conf < R.minConf ? "신뢰도" : !/[A-Za-z가-힣]/.test(t) ? "숫자·기호" : Math.min(...xs) <= edge || Math.max(...xs) >= W - 1 - edge ? "경계 잘림"
+        : SP.isGarbage(t) ? "잡음" : LIB_EDITION.test(t) ? "판수" : LIB_AUTHOR.test(t) ? "저자" : !EP.stripNonTitle(t, SP) ? "출판사·시리즈" : "";
+      if (!L.skip) read.push(L);
+    });
+    const top = read.length ? Math.max(...read.map((L) => Math.min(L.r.w, L.r.h))) : 0;
+    const sel = read.filter((L) => Math.min(L.r.w, L.r.h) >= R.sizeRatio * top).sort((a, b) => a.r.cy - b.r.cy || a.r.cx - b.r.cx).slice(0, R.maxTitle);
+    const titleLines = sel.map((L) => L.text), raw = titleLines.join(" "), corrected = libBestOrder(titleLines.map(libCorrectLine)).join(" ");
+    let hit = null;
+    for (const q of [...new Set([corrected, raw, ...titleLines])]) {
+      if (!q.trim()) continue;
+      const m = matcher.match(q, 3, true);
+      if (m.length && m[0].verified !== false && m[0].score >= R.match && (!hit || m[0].score > hit.score)) hit = m[0];
+    }
+    const ocrOk = SP.normalize(corrected).length >= 2 && !SP.isGarbage(corrected);
+    const [final, source] = hit ? [hit.title, "카탈로그"] : ocrOk ? [corrected, "OCR"] : ["Unknown", "-"];
+    return { title: hit ? hit.title : null, raw, corrected, score: hit ? hit.score : 0, final, source, calls, noText: !lines.length,
+             view: `글자 줄 ${lines.length}개 · 제목 ${sel.length}줄` + (corrected !== raw ? ` · 교정 "${raw}" → "${corrected}"` : ""),
+             textBoxes: lines.map((L) => ({ poly: L.p, text: L.text || "", selected: true, used: sel.includes(L) })) };
+  }
+  async function computeL(img, p0, p1) {
+    const span = p1 - p0, step = (t) => setProgress(p0 + span * 0.02, `Liber(β1): ${t}`);
+    const rt = await ensureE(step); libLex();
+    const t0 = performance.now();
+    setProgress(p0 + span * 0.05, "Liber(β1): ① 책 검출 중"); await new Promise((r) => setTimeout(r, 0));
+    const { books: found } = await EP.detectBooks(img, rt);
+    const tDet = performance.now() - t0, books = [];
+    for (let i = 0; i < found.length; i++) {
+      setProgress(p0 + span * (0.15 + 0.85 * i / Math.max(1, found.length)), `Liber(β1): ⑤~⑨ 제목 읽는 중 ${i + 1}/${found.length}`);
+      await new Promise((r) => setTimeout(r, 0));
+      const bk = found[i]; let r;
+      if (bk.spiral) r = { title: null, raw: "", corrected: "", score: 0, final: "Unknown", source: "스프링 노트", view: "스프링 제본", calls: 0, noText: true, textBoxes: [] };
+      else { const { crop, tf } = EP.cropBook(img, bk, AB.src); r = await libReadBook(crop, rt); EP.freeCanvas(crop); r.textBoxes = r.textBoxes.map((b) => ({ ...b, poly: b.poly.map(tf) })); }
+      books.push({ ...bk, ...r });
+    }
+    const R = { books, tDet, tAll: performance.now() - t0, calls: books.reduce((s, b) => s + b.calls, 0) };
+    setProgress(p1, "Liber(β1): 완료");
+    logLine(`Liber(β1) 결과: ${books.length}권 · 검출 ${(R.tDet / 1000).toFixed(1)}초 · 전체 ${(R.tAll / 1000).toFixed(1)}초 · 인식 호출 ${R.calls}회`);
+    const rows = books.map((b) => ({ title: b.final !== "Unknown" ? b.final : null, src: b.source, kind: b.kind, noText: b.noText, spiral: b.source === "스프링 노트", raw: b.raw || "", view: b.view }));
+    return { ...R, boxes: books, rows };
+  }
+  const AB = { A: null, B: null, D: null, E: null, L: null, img: null, view: "E", eView: 3 };
   // ---- PaddleOCR PP-OCRv5 한국어 인식기 (rten WASM) ----
   let PP = null, rtenReady = false;
   async function initRten() { if (!rtenReady) { RTEN.initSync({ module: await fetchBuf("rten.wasm") }); rtenReady = true; } }
@@ -2492,8 +2649,8 @@ if (typeof module !== "undefined") module.exports = ER;
   }
   // ---- 최종모델(E) 그림: 1 = Step 1 책 검출, 2 = Step 2 글자 검출, 3 = 최종 결과
   const PAL = [[230, 25, 75], [60, 180, 75], [255, 225, 25], [0, 130, 200], [245, 130, 48], [145, 30, 180], [70, 240, 240], [240, 50, 230], [210, 245, 60], [250, 190, 212], [0, 128, 128], [220, 190, 255], [170, 110, 40], [128, 0, 0]];
-  function drawE(view, show) {
-    const R = AB.E, img = AB.img, cv = $("cv"), g = cv.getContext("2d"), W = img.width, H = img.height;
+  function drawE(view, show, R = AB.E) {
+    const img = AB.img, cv = $("cv"), g = cv.getContext("2d"), W = img.width, H = img.height;
     cv.width = W; cv.height = H; g.drawImage(img, 0, 0);
     const lw = Math.max(2, W / 500), fs = Math.max(14, Math.round(W / 60)), path = (p) => { g.beginPath(); p.forEach(([x, y], j) => (j ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); };
     const vis = R.books.map((_, i) => !show || show[i]);
@@ -2535,7 +2692,11 @@ if (typeof module !== "undefined") module.exports = ER;
     const M = AB.view, R = AB[M]; if (!R) return; const f = AB.filter || "all", show = R.rows.map((r) => pass(r, f));
     $("eViews").hidden = M !== "E";
     if (M === "E") drawE(AB.eView, show);
-    else { $("cvCap").hidden = true; $("cvLeg").hidden = true; drawImage(AB.img, R.boxes, R.rows.map((r) => !!r.title), show); }
+    else if (M === "L") {
+      drawE(3, show, R);
+      const nCat = R.books.filter((b) => b.source === "카탈로그").length, nOcr = R.books.filter((b) => b.source === "OCR").length;
+      $("cvCap").textContent = `Liber(β1) 결과: 제목 인식 ${nCat + nOcr} / ${R.books.length}권 (카탈로그 확정 ${nCat} · 글자로 읽은 제목 ${nOcr}) · 전체 ${(R.tAll / 1000).toFixed(1)}초`;
+    } else { $("cvCap").hidden = true; $("cvLeg").hidden = true; drawImage(AB.img, R.boxes, R.rows.map((r) => !!r.title), show); }
   }
   for (const [id, v] of [["ev1", 1], ["ev2", 2], ["ev3", 3]]) $(id).addEventListener("click", () => {
     AB.eView = v; for (const [j, w] of [["ev1", 1], ["ev2", 2], ["ev3", 3]]) { $(j).classList.toggle("on", w === v); $(j).setAttribute("aria-selected", String(w === v)); }
@@ -2599,11 +2760,11 @@ if (typeof module !== "undefined") module.exports = ER;
     AB.view = M;
     for (const k of ["A", "B", "D", "E", "L"]) { const t = $("tab" + k); t.classList.toggle("on", k === M); t.setAttribute("aria-selected", String(k === M)); }
     $("cv").hidden = false;
-    $("spec").innerHTML = `<dt class="h">${CONFIGS[M].label} 적용 모델</dt>` + SPEC[M].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+    $("spec").innerHTML = M === "L" ? liberSpecHtml() : `<dt class="h">${CONFIGS[M].label} 적용 모델</dt>` + SPEC[M].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
     const f = AB.filter || "all";
     redraw(); renderList(R.rows, f); $("res").hidden = false;
     $("cmp").innerHTML = "";
-    for (const k of ["E", "A", "B", "D"]) {
+    for (const k of ["E", "L", "A", "B", "D"]) {
       const X = AB[k]; if (!X) continue;
       const d = document.createElement("div"); if (k === M) d.className = "on";
       const ok = X.rows.filter((r) => r.title).length, n = X.boxes.length, sec = (ms) => (ms / 1000).toFixed(2);
@@ -2614,11 +2775,10 @@ if (typeof module !== "undefined") module.exports = ER;
   // 탭을 처음 누르면 같은 사진을 그 모델로 인식
   async function openModel(M) {
     if (!AB.img || busy) return;
-    if (M === "L") { renderLiber(); return; }
     if (!AB[M]) {
       busy = true; let wake = null; try { wake = await navigator.wakeLock?.request("screen"); } catch (_) {}
       showProgress(`${CONFIGS[M].label}로 인식 중입니다.\n잠시만 기다려주세요.`);
-      try { AB[M] = M === "E" ? await computeE(AB.img, 0, 1) : await processModel(AB.img, M, 0, 1); saveRun(M); }
+      try { AB[M] = M === "E" ? await computeE(AB.img, 0, 1) : M === "L" ? await computeL(AB.img, 0, 1) : await processModel(AB.img, M, 0, 1); saveRun(M); }
       catch (e) { logError($("pmStep").textContent, e); $("dst").hidden = false; $("dst").textContent = `인식 실패 [${$("pmStep").textContent}] ${e && e.message ? e.message : e} · 아래 실행 로그를 확인해 주세요`; }
       finally { hideProgress(); try { await wake?.release(); } catch (_) {} busy = false; }
     }
@@ -2689,7 +2849,7 @@ if (typeof module !== "undefined") module.exports = ER;
   });
   function reset1() {
     if (busy) return;
-    AB.A = AB.B = AB.D = AB.E = AB.img = AB.src = null; AB.view = "E"; AB.eView = 3;
+    AB.A = AB.B = AB.D = AB.E = AB.L = AB.img = AB.src = null; AB.view = "E"; AB.eView = 3;
     for (const [j, w] of [["ev1", 1], ["ev2", 2], ["ev3", 3]]) { $(j).classList.toggle("on", w === 3); $(j).setAttribute("aria-selected", String(w === 3)); }
     $("eViews").hidden = true; $("cvCap").hidden = true; $("cvLeg").hidden = true;
     $("abWrap").hidden = true; $("cv").hidden = true; $("res").hidden = true; $("rList").innerHTML = ""; $("cmp").innerHTML = ""; $("dst").hidden = false;
