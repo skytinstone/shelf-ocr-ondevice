@@ -1,0 +1,45 @@
+# Liber Deprehensus — 책장 사진에서 책 권수·제목 추출 (On-Device, LLM 미사용)
+# Python 3.11 / macOS Apple Silicon. 가상환경 이름: liber
+
+# 공통
+numpy==2.3.5
+pillow==13.0.0
+matplotlib==3.11.2
+pandas==3.0.6
+requests==2.34.2
+rapidfuzz==3.14.6
+
+# 딥러닝 런타임
+torch==2.14.1
+torchvision==0.29.1
+safetensors==0.8.0
+
+# [Sub Model 1] 책 검출 YOLO11n-OBB + SAM 2 (ultralytics가 SAM2 가중치 로더 제공)
+ultralytics==8.4.183
+# 공개 책등 데이터셋 다운로드 (Roboflow Universe, CC BY 4.0)
+roboflow==1.7.1
+python-dotenv==1.2.4  # .env에서 API 키 읽기
+# 이미지 업스케일 FSRCNN은 cv2.dnn_superres(contrib) 사용.
+# ultralytics·paddlex가 opencv-python(-headless)를 같이 깔아 cv2가 덮어써지므로,
+# 설치 후 둘을 지우고 contrib을 다시 깐다 (README 참고).
+opencv-contrib-python==4.10.0.84
+
+# [Sub Model 1·2] ViT / TrOCR / mBART-50 (Hugging Face)
+# Hugging Face 모델 로더
+transformers==5.20.2
+sentencepiece==0.2.2
+huggingface_hub==2.2.0
+
+# [Sub Model 2] PP-OCRv5 (글자 영역 검출 · 언어 판별 · 인식)
+paddlepaddle==3.3.1
+paddleocr==3.7.0
+
+# 모바일 변환·추론 검증
+onnx==1.23.2
+onnxruntime==1.31.0
+onnxslim==0.1.98
+
+# 노트북
+ipykernel==7.4.0
+ipywidgets==8.1.9
+pillow-heif==1.8.1

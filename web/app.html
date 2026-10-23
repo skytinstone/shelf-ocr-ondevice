@@ -78,6 +78,8 @@ canvas { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--
 .spec .st.ok { background: #e3f4ea; color: #1f7a4d; } .spec .st.todo { background: #fff4dc; color: #9a6700; } .spec .st.hard { background: #fde8e8; color: #b42318; } .spec .st.sub { background: #e8eefc; color: #1f4fb4; }
 .spec .note2 { grid-column: 1 / -1; margin-top: 6px; color: var(--sub); line-height: 1.5; }
 .elcmp { margin: 14px 0 4px; }
+.brnote { margin: 8px 0 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: .84rem; color: var(--ink); background: var(--panel); }
+.brnote.off { border-color: var(--warn); background: #fff4dc; color: #7a4f00; }
 .vdiff { margin: 10px 0 12px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .vdiff h3 { font-size: .9rem; margin: 0; padding: 8px 10px; color: var(--acc); background: var(--bg); border-bottom: 1px solid var(--line); }
 .vdiff table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: .8rem; }
@@ -89,6 +91,9 @@ canvas { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--
 .vdiff td.new { background: #e3f4ea; color: #14532d; }
 .vdiff td.new b { color: var(--ok); }
 .vdiff tr:last-child td { border-bottom: 0; }
+.vdiff td.n, .vdiff th.n { text-align: right; font-family: var(--f-mono); }
+.vdiff td.up { color: var(--ok); font-weight: 700; } .vdiff td.eq { color: var(--sub); } .vdiff td.dn { color: var(--warn); font-weight: 700; }
+.vdiff h3.sub { border-top: 1px solid var(--line); }
 .vdiff .foot { margin: 0; padding: 7px 10px; font-size: .74rem; color: var(--sub); border-top: 1px solid var(--line); }
 .elcmp h3 { font-size: .95rem; margin: 0 0 6px; color: var(--acc); }
 .elcmp td { white-space: normal; vertical-align: top; }
@@ -171,6 +176,7 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
     <h1><small class="brand">사전과제 데모 · 비공식</small><span>On-Device 책 권수/제목 추출 시스템</span></h1>
     <p class="who">AI 엔지니어 사전과제 · 지원자 신민석</p>
     <p class="ver" id="appVer"></p>
+    <p class="brnote" id="brNote">이 데모는 <b>Chrome 브라우저</b>에 최적화되어 있습니다. Chrome으로 접속해 주세요.</p>
     <p class="lede">On-Device 환경에서 책장 이미지를 업로드하여, 책장에 꽂혀 있는 책들의 권 수와 책 제목들을 인식할 수 있는 시스템을 구성하였습니다.<br>※ 사진은 서버로 전송하거나 저장되지 않습니다.</p>
   </header>
 
@@ -223,6 +229,18 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
             <tr><td>모델 용량</td><td>37.3MB</td><td>60.6MB<small>+ TrOCR 121MB (필요할 때만 내려받음)</small></td></tr>
           </tbody>
         </table>
+        <h3 class="sub">성능 비교 · 고정 시험 세트 (사진 9장 · 정답 제목 113개)</h3>
+        <table>
+          <thead><tr><th>지표</th><th class="n">β1</th><th class="n">β2</th><th class="n">변화</th></tr></thead>
+          <tbody>
+            <tr><td>제목 재현율<small>정답 제목 중 맞힌 비율</small></td><td class="n">48.7%</td><td class="n">56.6%</td><td class="n up">+7.9%p<small>상대 +16.2%</small></td></tr>
+            <tr><td>제목 정밀도<small>읽어 낸 제목 중 맞은 비율</small></td><td class="n">49.1%</td><td class="n">54.7%</td><td class="n up">+5.6%p<small>상대 +11.4%</small></td></tr>
+            <tr><td>제목 F1<small>재현율·정밀도의 조화평균</small></td><td class="n">48.9%</td><td class="n">55.7%</td><td class="n up">+6.8%p<small>상대 +13.9%</small></td></tr>
+            <tr><td>권수 정확도<small>1 − |권수 오차| ÷ 정답 권수</small></td><td class="n">87.9%</td><td class="n">87.9%</td><td class="n eq">같음</td></tr>
+            <tr><td>평균 처리 시간<small>사진 1장</small></td><td class="n">31.6초</td><td class="n">41.8초</td><td class="n dn">+10.2초</td></tr>
+          </tbody>
+        </table>
+        <p class="foot">측정 방법: 사진마다 정답 권수·제목을 미리 적어 둔 시험 세트로 두 모델을 같은 조건에서 실행. 제목은 정답과 글자 유사도 80% 이상이면 맞음. 시간은 PC Chrome(아이폰 화면 크기)에서 잰 값으로, 실제 휴대폰에서는 더 걸립니다.</p>
         <p class="foot">LLM·멀티모달 대화형 모델은 쓰지 않습니다. 모든 모델은 이미지만 입력받는 단일 목적 비전 모델이며 휴대폰 안에서 실행됩니다.</p>
       </div>
       <dl class="spec" id="spec"></dl>
@@ -968,14 +986,14 @@ const DEVICES = [
 ].map(([group, name, chip, ram, year, reported]) => ({ group, name, chip, ram, year, reported: !!reported }));
 
 // 앱 버전: 최종 제출 전까지 0.x 유지, 패치마다 0.10 → 0.11 → 0.12 … 로 하나씩 올림
-const APP_VERSION = "0.22", APP_UPDATED = "2026-10-23 17:55 (KST)";
+const APP_VERSION = "0.23", APP_UPDATED = "2026-10-23 18:10 (KST)";
 
 // 최종모델(E) 용량 · 메모리 (MB). 검출기는 직접 학습한 YOLO11n-OBB (책등·표지 2클래스, 40에포크)
 const MODEL_INFO = {
   trainedPt: 5.66,        // Liber 본학습 det_obb_best.pt (1클래스 YOLO11n-OBB, 이전 2클래스와 거의 같은 크기)
   unified: 10.96,         // web/e_unified.onnx (FP32, 입력 960, Colab에서 변환 · 설정은 web/e_unified.json)
   others: 26.34,          // 글자 검출 4.87 + 영어 인식 7.93 + 한국어 인식 13.50
-  liber2: 144.12,         // + TrOCR 한국어 56.88 · 영어 63.93 (INT8, 필요할 때만 불러옴)
+  liber2: 87.24,          // + TrOCR 한 언어(최대 영어 63.93) — 한국어·영어를 동시에 두지 않고, ViT는 권수 확정 뒤 반납
   liber2Base: 23.31,          // Liber(β2) 추가: 권수 확정 ViT(DeiT-Small, MatMul만 INT8 — 웹 런타임에 ConvInteger 없음) 23.20 + FSRCNN x2·x3·x4 0.11
   runtime: 13.79,         // ONNX Runtime WASM 11.25 + rten WASM 2.54
   unifiedPeak: 223,       // e_unified.onnx 960 입력 1스레드 실행 시 최대 메모리 실측
@@ -2023,6 +2041,11 @@ if (typeof module !== "undefined") module.exports = ER;
   function setLocked(on) { for (const id of ["sec2", "sec3"]) $(id).classList.toggle("locked", on); }
   const mb = (v) => v >= 1000 ? (v / 1024).toFixed(1) + "GB" : Math.round(v) + "MB";
   $("appVer").textContent = `v${APP_VERSION} · 마지막 업데이트 ${APP_UPDATED}`;
+  // Chrome 안내: Chrome(아이폰은 CriOS)이 아니면 눈에 띄게 + 현재 브라우저 표시
+  {
+    const ua = navigator.userAgent || "", chrome = /CriOS\/|Chrome\//.test(ua) && !/Edg|OPR|SamsungBrowser|Whale|YaBrowser/.test(ua);
+    if (!chrome) { $("brNote").classList.add("off"); $("brNote").innerHTML = `⚠ 지금은 Chrome이 아닌 브라우저입니다. 이 데모는 <b>Chrome 브라우저</b>에 최적화되어 있습니다. Chrome으로 접속해 주세요.`; }
+  }
   $("mSpec").innerHTML = `<dt class="h">Liber(β2) 용량 (β1 + 권수 확정·업스케일)</dt>` +
     `<dt>학습한 검출기</dt><dd>YOLO11n-OBB 책 1클래스 (Liber 본학습: 1~3권 사진 보강) · ${MODEL_INFO.trainedPt.toFixed(1)}MB (PyTorch) · ${MODEL_INFO.unified.toFixed(1)}MB (웹용 ONNX)</dd>` +
     `<dt>글자 검출·인식</dt><dd>${MODEL_INFO.others.toFixed(1)}MB</dd>` +
@@ -2731,7 +2754,9 @@ if (typeof module !== "undefined") module.exports = ER;
       const redo = sel.filter((L) => best[lines.indexOf(L)].conf < R.trConf), tr = new Map();
       for (const L of redo) {
         const b = best[lines.indexOf(L)], en = /[A-Za-z]/.test(L.text) && !/[가-힣]/.test(L.text);
-        tr.set(L, await trocrRead(b.view, en ? "en" : "ko")); calls++;
+        if (TR.off) break;
+        try { tr.set(L, await trocrRead(b.view, en ? "en" : "ko")); calls++; }
+        catch (e) { TR.off = true; logError("⑧ TrOCR (메모리 부족 → 이번 실행에서 건너뜀)", e); await release(TR.ko && TR.ko.enc, TR.ko && TR.ko.dec, TR.en && TR.en.enc, TR.en && TR.en.dec); TR.ko = TR.en = null; }
       }
       const texts = sel.map((L) => { const t = tr.get(L), c = t && libClean(t.text); return c && /[0-9A-Za-z가-힣]/.test(c) && t.p > best[lines.indexOf(L)].conf ? c : L.text; });
       const used = texts.filter((t, k) => t !== sel[k].text).length;
@@ -2750,18 +2775,27 @@ if (typeof module !== "undefined") module.exports = ER;
              view: `글자 줄 ${lines.length}개 · 제목 ${sel.length}줄` + (corrected !== raw ? ` · 교정 "${raw}" → "${corrected}"` : "") + trNote,
              textBoxes: lines.map((L) => ({ poly: L.p, text: L.text || "", selected: true, used: sel.includes(L) })) };
   }
-  // ---- Liber(β2) 추가 모델: ③ 권수 확정 ViT(DeiT-Small INT8) · ④ 업스케일 FSRCNN (처음 쓸 때 한 번만 불러옴)
-  let L2RT = null;
-  async function ensureL2(step) {
-    if (L2RT) return L2RT;
+  // ---- Liber(β2) 추가 모델: ③ 권수 확정 ViT(DeiT-Small INT8) · ④ 업스케일 FSRCNN · ⑧ TrOCR
+  //  휴대폰 메모리: 필요한 단계 직전에 불러오고, 그 단계가 끝나면 바로 반납 (ViT는 권수 확정 뒤, FSRCNN·TrOCR은 β2가 끝난 뒤)
+  //  WASM 메모리는 줄어들지 않으므로, 반납해 둔 자리를 다음 모델이 다시 쓰게 해서 최대 사용량을 낮춤
+  const L2RT = { meta: null, vit: null, sr: null };
+  const release = async (...ss) => { for (const x of ss) if (x) try { await x.release(); } catch (_) {} };
+  async function loadVit(step) {
+    if (L2RT.vit) return;
     step("③ 권수 확정 분류기(DeiT-Small INT8 23MB) 불러오는 중");
-    const meta = await (await fetch("liber_vit_labels.json")).json();
-    const vit = await createSession(await fetchBuf("liber_vit_small_int8.onnx"));
+    if (!L2RT.meta) L2RT.meta = await (await fetch("liber_vit_labels.json")).json();
+    L2RT.vit = await createSession(await fetchBuf("liber_vit_small_int8.onnx"));
+  }
+  async function loadSr(step) {
+    if (L2RT.sr) return;
     step("④ 업스케일(FSRCNN) 불러오는 중");
     const sr = {};
     for (const k of LIB.SR.scales) sr[k] = await createSession(await fetchBuf(`fsrcnn_x${k}.onnx`));
-    L2RT = { vit, meta, sr };
-    return L2RT;
+    L2RT.sr = sr;
+  }
+  async function releaseL2() {
+    await release(L2RT.vit, ...(L2RT.sr ? Object.values(L2RT.sr) : []), TR.ko && TR.ko.enc, TR.ko && TR.ko.dec, TR.en && TR.en.enc, TR.en && TR.en.dec);
+    L2RT.vit = L2RT.sr = null; TR.ko = TR.en = null;
   }
   // ③ ViT 입력: 비율을 지켜 줄이고 회색(114) 여백으로 224 정사각형 (노트북 Letterbox와 같음) → (x/255 - mean) / std
   async function vitClassify(crop) {
@@ -2805,11 +2839,13 @@ if (typeof module !== "undefined") module.exports = ER;
   }
   // ⑧ TrOCR (한국어 team-lucid/trocr-small-korean · 영어 microsoft/trocr-small-printed): 인코더 + 디코더 INT8, 언어별로 처음 쓸 때 불러옴
   //  입력: 줄 이미지를 384×384로 늘려 (x/255-0.5)/0.5 (HF 전처리와 같음) → 디코더를 한 토큰씩 greedy (마지막 위치 logits만 내보낸 ONNX)
-  const TR = { vocab: null, ko: null, en: null };
+  const TR = { vocab: null, ko: null, en: null, off: false };   // off: 메모리 부족으로 이번 β2 실행에서 TrOCR을 끔
   async function ensureTr(lang) {
     if (!TR.vocab) TR.vocab = await (await fetch("trocr_vocab.json")).json();
     if (!TR[lang]) {
-      logLine(`⑧ TrOCR ${lang === "ko" ? "한국어" : "영어"} 불러오는 중 (${lang === "ko" ? "57" : "64"}MB, 처음 한 번)`);
+      const other = lang === "ko" ? "en" : "ko";   // 한 번에 한 언어만 메모리에 둠
+      if (TR[other]) { await release(TR[other].enc, TR[other].dec); TR[other] = null; }
+      logLine(`⑧ TrOCR ${lang === "ko" ? "한국어" : "영어"} 불러오는 중 (${lang === "ko" ? "57" : "64"}MB)`);
       TR[lang] = { enc: await createSession(await fetchBuf(`trocr_${lang}_enc.onnx`)), dec: await createSession(await fetchBuf(`trocr_${lang}_dec.onnx`)), V: TR.vocab[lang] };
     }
     return TR[lang];
@@ -2914,16 +2950,23 @@ if (typeof module !== "undefined") module.exports = ER;
     const rt = await ensureE(step); libLex();
     // 실험용: 주소 뒤 ?l2=novit,nosr,notr,fast 로 β2의 ③·④를 끄거나 책 단위 방향 결정을 켤 수 있음 (제거 실험)
     //  제거 실험 결과(정답 있는 7장): β2 전체 56.7% · 업스케일 끔 37.8% · 책 단위 방향 46.7% → 방향은 β1처럼 줄마다 정함
-    const off = v2 ? (new URLSearchParams(location.search).get("l2") || "") : "", useVit = v2 && !/novit/.test(off), useSr = v2 && !/nosr/.test(off), useTr = v2 && !/notr/.test(off), fast = v2 && /(^|,)fast/.test(off);
-    if (v2) await ensureL2(step);
+    const off = v2 ? (new URLSearchParams(location.search).get("l2") || "") : "", fast = v2 && /(^|,)fast/.test(off);
+    let useVit = v2 && !/novit/.test(off), useSr = v2 && !/nosr/.test(off);
+    const useTr = v2 && !/notr/.test(off), skipped = [];
+    TR.off = false;
+    // β2 추가 모델을 못 불러오면(메모리 부족 등) 그 단계만 건너뛰고 나머지는 계속
+    const tryLoad = async (name, fn) => { try { await fn(); return true; } catch (e) { logError(`${tag} ${name} 불러오기 (건너뜀)`, e); skipped.push(name); return false; } };
     const t0 = performance.now();
     setProgress(p0 + span * 0.05, `${tag}: ① 책 검출 중`); await new Promise((r) => setTimeout(r, 0));
     let { books: found } = await EP.detectBooks(img, rt), chunk = null;
     const nDet = found.length;
+    if (useVit) useVit = await tryLoad("③ ViT", () => loadVit(step));
     if (useVit) {
       setProgress(p0 + span * 0.1, `${tag}: ③ 권수 확정 중 (ViT)`); await new Promise((r) => setTimeout(r, 0));
       chunk = await libChunk(img, found); found = chunk.books;
+      await release(L2RT.vit); L2RT.vit = null;   // 권수 확정이 끝나면 바로 반납
     }
+    if (useSr) useSr = await tryLoad("④ FSRCNN", () => loadSr(step));
     const tDet = performance.now() - t0, books = [];
     let nSr = 0;
     for (let i = 0; i < found.length; i++) {
@@ -2943,13 +2986,14 @@ if (typeof module !== "undefined") module.exports = ER;
       if (bk.maybe && r.final === "Unknown" && bk.maybe.prob >= LIB.C.dropConf) { chunk.dropped.push({ idx: bk.maybe.it.idx, cls: bk.maybe.it.cls, prob: bk.maybe.prob, why: bk.maybe.why + " · 글자 없음" }); continue; }
       books.push({ ...bk, ...r });
     }
-    const R = { books, tDet, tAll: performance.now() - t0, calls: books.reduce((s, b) => s + b.calls, 0), nDet, chunk, nSr };
+    if (v2) { if (TR.off) skipped.push("⑧ TrOCR"); await releaseL2(); }   // FSRCNN·TrOCR 반납 → 다음 사진·β1 실행에 메모리를 돌려줌
+    const R = { books, tDet, tAll: performance.now() - t0, calls: books.reduce((s, b) => s + b.calls, 0), nDet, chunk, nSr, skipped };
     window.__LIB_LAST = books.map((b, i) => ({ no: i + 1, final: b.final, raw: b.raw, corrected: b.corrected, dbg: b.dbg, vit: b.vit }));
     (window.__LIB_RUNS = window.__LIB_RUNS || {})[v2 ? "L2" : "L"] = books.map((b) => ({ x: b.cx / img.width, y: b.cy / img.height, title: b.final !== "Unknown" ? b.final : null }));   // 개발용: 평가 스크립트가 사진 일부 영역(ROI)만 셀 때 사용
     if (chunk) window.__LIB2_CHUNK = { verdicts: chunk.verdicts, dropped: chunk.dropped.map((d) => `${d.idx + 1}:${d.cls} ${d.prob.toFixed(2)} → ${d.why}`), nSplit: chunk.nSplit, nSr };
     setProgress(p1, `${tag}: 완료`);
     logLine(`${tag} 결과: ${books.length}권` + (chunk ? ` (검출 ${nDet} → ③ 버림 ${chunk.dropped.length} · 나눔 ${chunk.nSplit} · ④ 업스케일 ${nSr}권)` : "") +
-      (off ? ` · 실험 옵션 ${off}` : "") + ` · 검출 ${(R.tDet / 1000).toFixed(1)}초 · 전체 ${(R.tAll / 1000).toFixed(1)}초 · 인식 호출 ${R.calls}회`);
+      (off ? ` · 실험 옵션 ${off}` : "") + (skipped.length ? ` · 메모리 부족으로 건너뜀: ${skipped.join(", ")}` : "") + ` · 검출 ${(R.tDet / 1000).toFixed(1)}초 · 전체 ${(R.tAll / 1000).toFixed(1)}초 · 인식 호출 ${R.calls}회`);
     const rows = books.map((b) => ({ title: b.final !== "Unknown" ? b.final : null, src: b.source, kind: b.kind, noText: b.noText, spiral: b.source === "스프링 노트", raw: b.raw || "", view: b.view }));
     return { ...R, boxes: books, rows };
   }
@@ -2974,7 +3018,7 @@ if (typeof module !== "undefined") module.exports = ER;
       try { const m = await (await fetch("e_unified.json", { cache: "no-cache" })).json(); for (const k of ["imgsz", "conf", "zoom", "inside"]) if (k in m) EP.CFG.unified[k] = m[k]; } catch (_) {}
       if (new URLSearchParams(location.search).get("rules") === "off") { EP.CFG.unified.rules = false; logLine("실험 옵션: 검출 규칙(가장자리 띠 제거) 끔"); }   // 제거 실험용
       try { unifiedSess = await createSession(ubuf); }
-      catch (e) { throw new Error(isOOM(e) ? "휴대폰 메모리가 부족해 모델을 불러오지 못했습니다. 다른 앱·탭을 닫고 페이지를 새로고침한 뒤 다시 시도해 주세요" : e && e.message ? e.message : String(e)); }
+      catch (e) { throw new Error(isOOM(e) || /no available backend/i.test(String(e && e.message || e)) ? "휴대폰 메모리가 부족해 모델을 불러오지 못했습니다. 이전 실행의 메모리가 아직 남아 있을 수 있습니다. 브라우저 탭을 완전히 닫고(탭 목록에서 닫기) 새 탭에서 다시 열어 주세요" : e && e.message ? e.message : String(e)); }
       ubuf = null;
       logLine(`Step 1: 통합 검출기(YOLO11n-OBB 책등·표지, 모든 방향, 입력 ${EP.CFG.unified.imgsz}) 사용`);
     } else {
@@ -3051,7 +3095,8 @@ if (typeof module !== "undefined") module.exports = ER;
       drawE(3, show, R);
       const nCat = R.books.filter((b) => b.source === "카탈로그").length, nOcr = R.books.filter((b) => b.source === "OCR").length;
       $("cvCap").textContent = `${CONFIGS[M].label} 결과: 제목 인식 ${nCat + nOcr} / ${R.books.length}권 (카탈로그 확정 ${nCat} · 글자로 읽은 제목 ${nOcr}) · 전체 ${(R.tAll / 1000).toFixed(1)}초` +
-        (R.chunk ? ` · ③ 검출 ${R.nDet} → 버림 ${R.chunk.dropped.length} · 나눔 ${R.chunk.nSplit} · ④ 업스케일 ${R.nSr}권` : "");
+        (R.chunk ? ` · ③ 검출 ${R.nDet} → 버림 ${R.chunk.dropped.length} · 나눔 ${R.chunk.nSplit} · ④ 업스케일 ${R.nSr}권` : "") +
+        (R.skipped && R.skipped.length ? ` · ⚠ 메모리 부족으로 건너뜀: ${R.skipped.join(", ")}` : "");
     } else { $("cvCap").hidden = true; $("cvLeg").hidden = true; drawImage(AB.img, R.boxes, R.rows.map((r) => !!r.title), show); }
   }
   for (const [id, v] of [["ev1", 1], ["ev2", 2], ["ev3", 3]]) $(id).addEventListener("click", () => {
@@ -3192,7 +3237,7 @@ if (typeof module !== "undefined") module.exports = ER;
       busy = true; let wake = null; try { wake = await navigator.wakeLock?.request("screen"); } catch (_) {}
       showProgress(`${CONFIGS[M].label}로 인식 중입니다.\n잠시만 기다려주세요.`);
       try { AB[M] = M === "E" ? await computeE(AB.img, 0, 1) : M === "L" || M === "L2" ? await computeL(AB.img, 0, 1, M === "L2") : await processModel(AB.img, M, 0, 1); saveRun(M); }
-      catch (e) { logError($("pmStep").textContent, e); $("dst").hidden = false; $("dst").textContent = `인식 실패 [${$("pmStep").textContent}] ${e && e.message ? e.message : e} · 아래 실행 로그를 확인해 주세요`; }
+      catch (e) { logError($("pmStep").textContent, e); $("dst").hidden = false; $("dst").textContent = `인식 실패 [${$("pmStep").textContent}] ${e && e.message ? e.message : e} · 아래 실행 로그를 확인해 주세요`; if (M === "L2") await releaseL2(); }
       finally { hideProgress(); try { await wake?.release(); } catch (_) {} busy = false; }
     }
     renderModel(M);

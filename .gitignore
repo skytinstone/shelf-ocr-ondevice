@@ -19,3 +19,11 @@ docs/
 datasets/openimages/
 datasets/books_obb/images/train/oi_*
 datasets/books_obb/labels/train/oi_*
+
+# Liber Deprehensus: 가상환경 · 내려받은 데이터 · 학습 산출물
+liber_deprehensus/liber/
+liber_deprehensus/.env
+liber_deprehensus/data/
+liber_deprehensus/*.zip
+liber_deprehensus/outputs/*
+!liber_deprehensus/outputs/.gitkeep
