@@ -78,6 +78,18 @@ canvas { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--
 .spec .st.ok { background: #e3f4ea; color: #1f7a4d; } .spec .st.todo { background: #fff4dc; color: #9a6700; } .spec .st.hard { background: #fde8e8; color: #b42318; } .spec .st.sub { background: #e8eefc; color: #1f4fb4; }
 .spec .note2 { grid-column: 1 / -1; margin-top: 6px; color: var(--sub); line-height: 1.5; }
 .elcmp { margin: 14px 0 4px; }
+.vdiff { margin: 10px 0 12px; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.vdiff h3 { font-size: .9rem; margin: 0; padding: 8px 10px; color: var(--acc); background: var(--bg); border-bottom: 1px solid var(--line); }
+.vdiff table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: .8rem; }
+.vdiff th, .vdiff td { white-space: normal; vertical-align: top; padding: 7px 8px; overflow-wrap: anywhere; }
+.vdiff th:first-child, .vdiff td:first-child { width: 27%; }
+.vdiff td:first-child { font-weight: 600; }
+.vdiff td small { display: block; color: var(--sub); font-size: .72rem; margin-top: 2px; }
+.vdiff td.same { color: var(--sub); }
+.vdiff td.new { background: #e3f4ea; color: #14532d; }
+.vdiff td.new b { color: var(--ok); }
+.vdiff tr:last-child td { border-bottom: 0; }
+.vdiff .foot { margin: 0; padding: 7px 10px; font-size: .74rem; color: var(--sub); border-top: 1px solid var(--line); }
 .elcmp h3 { font-size: .95rem; margin: 0 0 6px; color: var(--acc); }
 .elcmp td { white-space: normal; vertical-align: top; }
 .elcmp td small { display: block; color: var(--sub); font-size: .72rem; }
@@ -196,6 +208,22 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
       <div class="tabs tabs3" role="tablist">
         <button type="button" role="tab" id="tabL" class="tab on" aria-selected="true">Liber(β1)</button>
         <button type="button" role="tab" id="tabL2" class="tab" aria-selected="false">Liber(β2)</button>
+      </div>
+      <div class="vdiff">
+        <h3>Liber β1 → β2, 무엇이 달라졌나</h3>
+        <table>
+          <thead><tr><th>단계</th><th>β1</th><th>β2</th></tr></thead>
+          <tbody>
+            <tr><td>① 책 검출</td><td colspan="2" class="same">YOLO11n-OBB (Liber 본학습) · 둘 다 같음</td></tr>
+            <tr><td>③ 권수 확정</td><td class="same">검출 결과를 그대로 셈</td><td class="new"><b>+ ViT 분류</b> (DeiT-Small)<small>붙은 책 나누기 · 잘린 조각 합치기 · 책이 아닌 상자 버리기</small></td></tr>
+            <tr><td>④ 업스케일</td><td class="same">없음</td><td class="new"><b>+ FSRCNN</b><small>폭이 좁은 책등만 2~4배로 키워 작은 글씨를 살림</small></td></tr>
+            <tr><td>⑤⑥⑦ 글자 찾기·방향·정렬</td><td colspan="2" class="same">PP-OCRv5 글자 검출 · 줄마다 방향 결정 · 회전 펴기 + 대비 보정 · 둘 다 같음</td></tr>
+            <tr><td>⑧ 글자 인식</td><td class="same">PP-OCRv5</td><td class="new">PP-OCRv5 <b>+ TrOCR</b><small>확정 안 된 책의 애매한 제목 줄만 한 번 더 읽고, 더 확신하는 쪽을 씀</small></td></tr>
+            <tr><td>⑨ 제목 확정</td><td colspan="2" class="same">규칙 + 글자 5-gram 교정 + 카탈로그 매칭 (비신경망) · 둘 다 같음</td></tr>
+            <tr><td>모델 용량</td><td>37.3MB</td><td>60.6MB<small>+ TrOCR 121MB (필요할 때만 내려받음)</small></td></tr>
+          </tbody>
+        </table>
+        <p class="foot">LLM·멀티모달 대화형 모델은 쓰지 않습니다. 모든 모델은 이미지만 입력받는 단일 목적 비전 모델이며 휴대폰 안에서 실행됩니다.</p>
       </div>
       <dl class="spec" id="spec"></dl>
       <div class="cmp" id="cmp"></div>
@@ -940,7 +968,7 @@ const DEVICES = [
 ].map(([group, name, chip, ram, year, reported]) => ({ group, name, chip, ram, year, reported: !!reported }));
 
 // 앱 버전: 최종 제출 전까지 0.x 유지, 패치마다 0.10 → 0.11 → 0.12 … 로 하나씩 올림
-const APP_VERSION = "0.21", APP_UPDATED = "2026-10-23 17:40 (KST)";
+const APP_VERSION = "0.22", APP_UPDATED = "2026-10-23 17:55 (KST)";
 
 // 최종모델(E) 용량 · 메모리 (MB). 검출기는 직접 학습한 YOLO11n-OBB (책등·표지 2클래스, 40에포크)
 const MODEL_INFO = {
