@@ -191,20 +191,19 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
       <label class="file-btn ghost">보관함에서 선택<input id="lib" type="file" accept="image/*"></label>
       <button id="reset1" type="button" class="ghost">초기화</button>
     </div>
-    <p class="status" id="dst">사진을 넣으면 최종모델(E)로 인식합니다. 다른 모델 탭을 누르면 같은 사진을 그 모델로 인식해 비교합니다.</p>
+    <p class="status" id="dst">사진을 넣으면 Liber(β1)로 인식합니다. Liber(β2) 탭을 누르면 같은 사진을 β2로 인식해 비교합니다.</p>
     <div id="abWrap" hidden>
       <div class="tabs tabs3" role="tablist">
-        <button type="button" role="tab" id="tabD" class="tab" aria-selected="false">PaddleOCR(D)</button>
-        <button type="button" role="tab" id="tabE" class="tab on" aria-selected="true">최종모델(E)</button>
-        <button type="button" role="tab" id="tabL" class="tab" aria-selected="false">Liber(β1)</button>
+        <button type="button" role="tab" id="tabL" class="tab on" aria-selected="true">Liber(β1)</button>
+        <button type="button" role="tab" id="tabL2" class="tab" aria-selected="false">Liber(β2)</button>
       </div>
       <dl class="spec" id="spec"></dl>
       <div class="cmp" id="cmp"></div>
       <div class="elcmp" id="elCmp" hidden>
-        <h3>최종모델(E) · Liber(β1) 인식 비교</h3>
+        <h3>Liber(β1) · Liber(β2) 인식 비교</h3>
         <p class="note" id="elNote"></p>
-        <div class="tbl" id="elSumWrap"><table><thead><tr><th>항목</th><th class="n">최종모델(E)</th><th class="n">Liber(β1)</th></tr></thead><tbody id="elSum"></tbody></table></div>
-        <div class="tbl" id="elTblWrap"><table><thead><tr><th>번호</th><th>종류</th><th>최종모델(E)</th><th>Liber(β1)</th><th>비교</th></tr></thead><tbody id="elBody"></tbody></table></div>
+        <div class="tbl" id="elSumWrap"><table><thead><tr><th>항목</th><th class="n">Liber(β1)</th><th class="n">Liber(β2)</th></tr></thead><tbody id="elSum"></tbody></table></div>
+        <div class="tbl" id="elTblWrap"><table><thead><tr><th>번호</th><th>종류</th><th>Liber(β1)</th><th>Liber(β2)</th><th>비교</th></tr></thead><tbody id="elBody"></tbody></table></div>
         <div class="row"><button type="button" class="ghost" id="elRun" hidden></button><button type="button" class="ghost" id="elCopy" hidden>비교표 복사</button></div>
       </div>
     </div>
@@ -229,7 +228,7 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
       </div>
       <ol id="rList" class="blist"></ol>
       <p class="fempty" id="fEmpty" hidden></p>
-      <p class="note" id="noteMain">제목 미인식은 책등에 글자가 없는 제본 책이거나, 글자를 읽었지만 확신이 부족해 확정하지 않은 책입니다. 서비스에서는 후보를 보여주고 사용자가 고르게 합니다. 데모 카탈로그는 도서 138권입니다. 최종모델(E)은 카탈로그에 없는 책도 글자로 읽은 제목을 파란색으로 보여 줍니다.</p>
+      <p class="note" id="noteMain">제목 미인식은 책등에 글자가 없는 제본 책이거나, 글자를 읽었지만 확신이 부족해 확정하지 않은 책입니다. 서비스에서는 후보를 보여주고 사용자가 고르게 합니다. 데모 카탈로그는 도서 138권입니다. Liber는 카탈로그에 없는 책도 글자로 읽은 제목을 파란색으로 보여 줍니다.</p>
     </div>
     <details class="logbox" id="logBox" hidden>
       <summary>실행 로그 (시작 시각 · 경과 시간 · 오류)</summary>
@@ -941,18 +940,19 @@ const DEVICES = [
 ].map(([group, name, chip, ram, year, reported]) => ({ group, name, chip, ram, year, reported: !!reported }));
 
 // 앱 버전: 최종 제출 전까지 0.x 유지, 패치마다 0.10 → 0.11 → 0.12 … 로 하나씩 올림
-const APP_VERSION = "0.19", APP_UPDATED = "2026-10-23 13:03 (KST)";
+const APP_VERSION = "0.20", APP_UPDATED = "2026-10-23 16:30 (KST)";
 
 // 최종모델(E) 용량 · 메모리 (MB). 검출기는 직접 학습한 YOLO11n-OBB (책등·표지 2클래스, 40에포크)
 const MODEL_INFO = {
   trainedPt: 5.66,        // Liber 본학습 det_obb_best.pt (1클래스 YOLO11n-OBB, 이전 2클래스와 거의 같은 크기)
   unified: 10.96,         // web/e_unified.onnx (FP32, 입력 960, Colab에서 변환 · 설정은 web/e_unified.json)
   others: 26.34,          // 글자 검출 4.87 + 영어 인식 7.93 + 한국어 인식 13.50
+  liber2: 23.31,          // Liber(β2) 추가: 권수 확정 ViT(DeiT-Small, MatMul만 INT8 — 웹 런타임에 ConvInteger 없음) 23.20 + FSRCNN x2·x3·x4 0.11
   runtime: 13.79,         // ONNX Runtime WASM 11.25 + rten WASM 2.54
   unifiedPeak: 223,       // e_unified.onnx 960 입력 1스레드 실행 시 최대 메모리 실측
   imageBuf: 96,           // 12MP 사진 RGBA 48MB × 원본·작업용 2장
 };
-MODEL_INFO.peak = Math.round(MODEL_INFO.unifiedPeak + MODEL_INFO.others * 3 + MODEL_INFO.runtime + MODEL_INFO.imageBuf);   // 나머지 모델은 가중치의 3배(사본·작업 메모리)로 잡음
+MODEL_INFO.peak = Math.round(MODEL_INFO.unifiedPeak + (MODEL_INFO.others + MODEL_INFO.liber2) * 3 + MODEL_INFO.runtime + MODEL_INFO.imageBuf);   // 나머지 모델은 가중치의 3배(사본·작업 메모리)로 잡음
 const RAM_BUDGET = 0.25;  // 브라우저 탭 하나가 안정적으로 쓸 수 있는 메모리 = 기기 RAM의 25% (OS·다른 앱 몫을 뺀 보수적 기준)
 
 // ===== 책장 인식 파이프라인 (기기 내 실행) =====
@@ -1769,7 +1769,7 @@ const EP = (() => {
   }
 
   function init(mkFn) { mk = mkFn; }
-  return { CFG, init, runE, setNonTitles, stripNonTitle, detectBooks, readTitleE, minAreaRect, bboxOf, spiralScore, fuseBoxes, cropBook, freeCanvas: free, ACCEPT };
+  return { CFG, init, runE, setNonTitles, stripNonTitle, detectBooks, readTitleE, minAreaRect, bboxOf, spiralScore, fuseBoxes, cropBook, cropUpright, polyArea, polyInter, freeCanvas: free, ACCEPT };
 })();
 if (typeof module !== "undefined") module.exports = EP;
 
@@ -1994,10 +1994,11 @@ if (typeof module !== "undefined") module.exports = ER;
   function setLocked(on) { for (const id of ["sec2", "sec3"]) $(id).classList.toggle("locked", on); }
   const mb = (v) => v >= 1000 ? (v / 1024).toFixed(1) + "GB" : Math.round(v) + "MB";
   $("appVer").textContent = `v${APP_VERSION} · 마지막 업데이트 ${APP_UPDATED}`;
-  $("mSpec").innerHTML = `<dt class="h">최종모델(E) 용량</dt>` +
+  $("mSpec").innerHTML = `<dt class="h">Liber(β2) 용량 (β1 + 권수 확정·업스케일)</dt>` +
     `<dt>학습한 검출기</dt><dd>YOLO11n-OBB 책 1클래스 (Liber 본학습: 1~3권 사진 보강) · ${MODEL_INFO.trainedPt.toFixed(1)}MB (PyTorch) · ${MODEL_INFO.unified.toFixed(1)}MB (웹용 ONNX)</dd>` +
     `<dt>글자 검출·인식</dt><dd>${MODEL_INFO.others.toFixed(1)}MB</dd>` +
-    `<dt>모델 합계</dt><dd>${(MODEL_INFO.unified + MODEL_INFO.others).toFixed(1)}MB</dd>` +
+    `<dt>권수 확정·업스케일 (β2)</dt><dd>DeiT-Small INT8 23.2MB · FSRCNN 0.1MB</dd>` +
+    `<dt>모델 합계</dt><dd>${(MODEL_INFO.unified + MODEL_INFO.others + MODEL_INFO.liber2).toFixed(1)}MB (β1만 쓰면 ${(MODEL_INFO.unified + MODEL_INFO.others).toFixed(1)}MB)</dd>` +
     `<dt>실행 시 메모리</dt><dd>최대 약 ${MODEL_INFO.peak}MB (예상)</dd>`;
   // 사양표 RAM 문자열에서 가장 작은 용량(GB) → 없으면 브라우저가 알려 주는 값(Android Chrome, 최대 8GB로 표시)
   function ramOf(d) {
@@ -2439,13 +2440,15 @@ if (typeof module !== "undefined") module.exports = ER;
     D: { label: "PaddleOCR(D)", det: "det640_int8", size: 640, adaptive: true, rec: "pp5", opts: { clahe: false, early: true, verify: true, noText: true, prep: (im) => ppPrep(im) } },
     E: { label: "최종모델(E)" },
     L: { label: "Liber(β1)" },
+    L2: { label: "Liber(β2)" },
   };
   // 탭마다 내려받는 모델 파일 용량(MB, 실제 파일에서 잰 값 · base64 해독 후) — 설명 칸·모델 카드·비교표에 표시
   const ENGINE_MB = [["ONNX Runtime WASM", 11.25], ["rten WASM", 2.54]];
   const MODEL_SIZE = {
     D: { parts: [["책등 검출 640", 3.18], ["원거리 재검출 1280", 3.49], ["한국어 인식", 13.5]], note: "원거리 재검출은 멀리서 찍은 사진에서만 불러옴" },
     E: { parts: [["책 검출", 10.96], ["글자 검출", 4.87], ["한국어 인식", 13.5], ["영어 인식", 7.93]] },
-    L: { parts: [["책 검출", 10.96], ["글자 검출", 4.87], ["한국어 인식", 13.5], ["영어 인식", 7.93]], note: "최종모델(E)과 같은 파일을 함께 씀 → E를 쓴 뒤라면 추가 다운로드 0MB" },
+    L: { parts: [["책 검출", 10.96], ["글자 검출", 4.87], ["한국어 인식", 13.5], ["영어 인식", 7.93]] },
+    L2: { parts: [["책 검출", 10.96], ["권수 확정 ViT", 23.20], ["업스케일 FSRCNN", 0.11], ["글자 검출", 4.87], ["한국어 인식", 13.5], ["영어 인식", 7.93]], note: "β1과 같은 파일 + 권수 확정 ViT·업스케일 FSRCNN → β1을 쓴 뒤라면 추가 다운로드 23.3MB" },
   };
   const modelMB = (M) => MODEL_SIZE[M].parts.reduce((a, [, v]) => a + v, 0);
   const engineMB = ENGINE_MB.reduce((a, [, v]) => a + v, 0);
@@ -2467,23 +2470,25 @@ if (typeof module !== "undefined") module.exports = ER;
   // ---- Liber(β1 · Liber-lite): PC 노트북(liber_deprehensus.ipynb)에서 검증한 Liber의 글자 쪽 단계를 새 모델 없이 옮긴 것
   //  ① 책 검출은 최종모델(E)의 통합 검출기, ⑧ 글자 인식은 TrOCR 대신 PP-OCRv5를 빌려 쓰고
   //  ⑥ 줄마다 방향(90°·180°·세로쓰기) 선택 · ⑦ 회전 사각형 펴기 + 여백 + CLAHE · ⑨ 규칙 + 글자 5-gram 교정 + 카탈로그 매칭은 Liber 그대로
-  const LIBER_ST = { ok: "β1 적용", sub: "대체 사용", todo: "β2 예정", hard: "β3 검토" };
+  const LIBER_ST = { ok: "적용", sub: "대체 사용", todo: "β2에서 적용", hard: "β3 검토" };
+  // [블록, 설계 모델, β1 상태, β1 설명, β2 상태, β2 설명]
   const LIBER_SPEC = [
-    ["① 책 검출", "YOLO11n-OBB (Liber 본학습)", "ok", "1~3권 사진 보강 · Colab 본학습 · 최종모델(E)과 같은 검출기 → 두 모델의 책 번호가 같음"],
-    ["② 가짜 책 필터", "SAM 2.1 tiny", "hard", "휴대폰 속도·메모리 실측 후 결정 · 지금은 건너뜀"],
-    ["③ 권수 확정", "ViT 4종 분류", "todo", "DeiT-Small(약 22MB) · 지금은 검출 결과를 그대로 권수로 사용"],
-    ["④ 업스케일", "FSRCNN", "todo", "약 40KB · 지금은 원본 해상도에서 자름"],
-    ["⑤ 글자 검출", "PP-OCRv5 det", "ok", "최종모델(E)과 같은 모델 (4.9MB)"],
-    ["⑥ 언어·방향", "PP-OCRv5 rec", "ok", "줄마다 방향 후보(90°·180°·세로쓰기) 중 인식 점수가 가장 높은 것"],
-    ["⑦ ROI 정렬", "회전 펴기 + CLAHE", "ok", "줄 사각형을 바로 펴고 여백 15% · 대비 보정 (JS)"],
-    ["⑧ 글자 인식", "TrOCR 한국어·영어", "sub", "PP-OCRv5 한국어·영어 인식기로 대체 · TrOCR(각 약 60MB)는 β3에서 검토"],
-    ["⑨ 제목 확정", "규칙 + 글자 5-gram + 카탈로그", "ok", "저자·판수·잘린 줄 제외 → 단어 교정·어순 → 카탈로그 확정 (모두 비신경망)"],
+    ["① 책 검출", "YOLO11n-OBB (Liber 본학습)", "ok", "1~3권 사진 보강 · Colab 본학습 · 960 입력 · 신뢰도 0.45", "ok", "β1과 같음"],
+    ["② 가짜 책 필터", "SAM 2.1 tiny", "hard", "휴대폰 속도·메모리 실측 후 결정 · 지금은 건너뜀", "hard", "β3: 애매한 상자가 있을 때만 부르는 방식으로 검토"],
+    ["③ 권수 확정", "ViT 4종 분류", "todo", "검출 결과를 그대로 권수로 사용", "ok", "DeiT-Small INT8 23.2MB · book / not_book 버림 / partial 합침 / multiple 낱권 두께로 나눔 · 중복 정리"],
+    ["④ 업스케일", "FSRCNN", "todo", "원본 해상도에서 그대로 자름", "ok", "FSRCNN x2~x4 (각 35KB) · 책 폭이 96px보다 좁을 때만 · 밝기(Y)만 키우고 색은 보간"],
+    ["⑤ 글자 검출", "PP-OCRv5 det", "ok", "PP-OCRv5 mobile det (DBNet) 4.9MB", "ok", "β1과 같음"],
+    ["⑥ 언어·방향", "PP-OCRv5 rec", "ok", "줄마다 방향 후보(90°·180°·세로쓰기)를 모두 읽고 점수가 가장 높은 것", "ok", "가장 큰 줄로 책의 방향을 먼저 정하고 나머지 줄은 그 방향만 읽음 · 점수가 낮은 줄만 다른 방향을 다시 읽음"],
+    ["⑦ ROI 정렬", "회전 펴기 + CLAHE", "ok", "줄 사각형을 바로 펴고 여백 15% · 대비 보정 (JS)", "ok", "β1과 같음"],
+    ["⑧ 글자 인식", "TrOCR 한국어·영어", "sub", "PP-OCRv5 한국어·영어 인식기 (CTC)로 대체", "sub", "β1과 같음 · TrOCR(각 약 60MB)는 β3에서 검토"],
+    ["⑨ 제목 확정", "규칙 + 글자 5-gram + 카탈로그", "ok", "저자·판수·잘린 줄 제외 → 단어 교정·어순 → 카탈로그 확정 (모두 비신경망)", "ok", "β1과 같음"],
   ];
-  function liberSpecHtml() {
-    return `<dt class="h">Liber(β1 · Liber-lite) 적용 모델</dt>` + sizeRow("L") +
+  function liberSpecHtml(M = "L") {
+    const v2 = M === "L2";
+    return `<dt class="h">${CONFIGS[M].label} 적용 모델</dt>` + sizeRow(M) +
       `<dd class="note2"><img src="liber_arch.png" alt="Liber 모델 아키텍처" style="display:block;width:100%;max-width:560px;margin:4px auto 8px;border:1px solid var(--line);border-radius:8px;background:#fff"></dd>` +
-      LIBER_SPEC.map(([b, m, st, note]) => `<dt>${b}</dt><dd><span class="st ${st}">${LIBER_ST[st]}</span>${m}<br><small>${note}</small></dd>`).join("") +
-      `<dd class="note2">β1은 새 모델을 받지 않습니다. 책 검출과 글자 인식은 최종모델(E)의 모델을 빌려 쓰고, Liber에서 새로 만든 줄 단위 방향·세로쓰기 판별, 글자 줄 정렬, 비신경망 제목 교정을 적용합니다. ②③④는 β2·β3에서 추가합니다.</dd>`;
+      LIBER_SPEC.map(([b, m, s1, n1, s2, n2]) => { const st = v2 ? s2 : s1, note = v2 ? n2 : n1; return `<dt>${b}</dt><dd><span class="st ${st}">${LIBER_ST[st]}</span>${m}<br><small>${note}</small></dd>`; }).join("") +
+      `<dd class="note2">${v2 ? "β2 = β1 + ③ 권수 확정(ViT) + ④ 업스케일(FSRCNN) + 책 단위 방향 결정. ②(SAM 2)·⑧(TrOCR)은 휴대폰 속도·메모리 때문에 β3에서 필요할 때만 부르는 방식으로 검토합니다." : "β1 = ① 책 검출 + ⑤~⑨ 글자 쪽 단계. ③ 권수 확정·④ 업스케일은 β2에서 추가합니다."}</dd>`;
   }
 
   const LIB = {
@@ -2492,7 +2497,12 @@ if (typeof module !== "undefined") module.exports = ER;
          numRatio: 0.75,                         // 숫자만 있는 줄(2027 등)도 이만큼 크면 제목에 포함
          lineMatch: 88, reorderGain: 10,
          volBoxes: 6,                            // 권차 찾기용으로 따로 읽는 작은 정사각형 글자 상자 수         // 제목 줄이 아닌 줄의 카탈로그 확정 점수 · 어순을 바꾸려면 필요한 카탈로그 점수 상승
-         n: 5, maxEdit: 2, editRatio: 0.25, minJamo: 5, errW: 4.0, beam: 8, cands: 5, orderMargin: 0.1 },
+         n: 5, maxEdit: 2, editRatio: 0.25, minJamo: 5, errW: 4.0, beam: 8, cands: 5, orderMargin: 0.1,
+         retryConf: 0.5 },                       // β2: 책 방향으로 읽은 줄의 점수가 이보다 낮으면 다른 방향도 다시 읽음
+    // β2 ③ 권수 확정 규칙 (노트북 Cell 3-3 CHUNK_RULES와 같은 값)
+    C: { minConf: 0.60, partialKeep: 0.80, overlap: 0.50, finalDup: 0.50 },
+    // β2 ④ 업스케일 (노트북 Cell 4-1과 같은 값)
+    SR: { target: 96, maxLong: 2400, scales: [2, 3, 4] },
     lex: null,
   };
   const LIB_AUTHOR = /(지음|지은이|옮김|공역|편역|편저|감수|역|저|著)\s*$|^[가-힣]{2,4}\s*[·•+∙,]\s*[가-힣]{2,4}|[《〈(\[]\s*(공?역|공?저|편|감수|옮김)\s*[》〉)\]]|^.{0,3}수\s*:|^([가-힣]{3}\s+){2,}[가-힣]{3}$/;   // 마지막: 줄 전체가 세 글자 이름 3개 이상 (구분 기호가 빠진 저자 목록)
@@ -2588,22 +2598,39 @@ if (typeof module !== "undefined") module.exports = ER;
   }
 
   // 책 1권: ⑤ 글자 줄 → ⑦ 펴기·CLAHE → ⑥ 방향 후보 인식 → ⑨ 제목 조립·교정·카탈로그
-  async function libReadBook(crop, rt, kind) {
+  async function libReadBook(crop, rt, kind, fast = false) {
     const R = LIB.R, W = crop.width;
     const polys0 = await rt.textDet(crop);
     const lines = polys0.map((p) => ({ p, r: EP.minAreaRect(p) })).filter((x) => Math.min(x.r.w, x.r.h) >= 6)
       .sort((a, b) => Math.min(b.r.w, b.r.h) - Math.min(a.r.w, a.r.h)).slice(0, R.maxLines);
-    const views = [], owner = [], tmp = [];
-    lines.forEach((L, i) => {
+    const cand = [], tmp = [];
+    lines.forEach((L) => {
       const flat = libRectCrop(crop, L.p, R.pad), roi = libClahe(flat); EP.freeCanvas(flat); tmp.push(roi);
-      const cand = roi.height > R.vertical * roi.width ? [["cw", libRot(roi, 1)], ["ccw", libRot(roi, 3)], ["stack", libStack(roi)]] : [["0", roi], ["180", libRot(roi, 2)]];
-      for (const [o, v] of cand) { views.push(v); owner.push([i, o]); if (v !== roi) tmp.push(v); }
+      const c = roi.height > R.vertical * roi.width ? [["cw", libRot(roi, 1)], ["ccw", libRot(roi, 3)], ["stack", libStack(roi)]] : [["0", roi], ["180", libRot(roi, 2)]];
+      for (const [, v] of c) if (v !== roi) tmp.push(v);
+      cand.push(c);
     });
-    const ko = views.length ? await rt.recKo(views) : [], best = lines.map(() => null);
-    ko.forEach((res, k) => { const [i, o] = owner[k]; if (!best[i] || res[1] > best[i].conf) best[i] = { text: res[0], conf: res[1], o, view: views[k] }; });
+    const best = lines.map(() => null);
+    let nRec = 0;
+    const readSet = async (todo) => {   // todo: [줄 번호, 방향, 이미지]
+      if (!todo.length) return;
+      const res = await rt.recKo(todo.map((t) => t[2])); nRec += todo.length;
+      res.forEach((r, k) => { const [i, o, v] = todo[k]; if (!best[i] || r[1] > best[i].conf) best[i] = { text: r[0], conf: r[1], o, view: v }; });
+    };
+    const allOf = (i) => cand[i].map(([o, v]) => [i, o, v]);
+    if (!fast) await readSet(lines.flatMap((_, i) => allOf(i)));   // β1: 줄마다 모든 방향
+    else {
+      // β2: 세로 줄·가로 줄마다 가장 큰 줄(lines는 글자 크기순)로 책의 방향을 정하고, 나머지 줄은 그 방향만 → 점수가 낮은 줄만 다른 방향을 다시 읽음
+      const vert = (i) => cand[i].length === 3, leads = [lines.findIndex((_, i) => vert(i)), lines.findIndex((_, i) => !vert(i))].filter((i) => i >= 0);
+      await readSet(leads.flatMap(allOf));
+      const dir = new Map(leads.map((i) => [vert(i), best[i] && best[i].o]));
+      const rest = lines.map((_, i) => i).filter((i) => !leads.includes(i));
+      await readSet(rest.map((i) => { const c = cand[i].find(([o]) => o === dir.get(vert(i))) || cand[i][0]; return [i, c[0], c[1]]; }));
+      await readSet(rest.filter((i) => !best[i] || best[i].conf < R.retryConf).flatMap((i) => allOf(i).filter(([, o]) => !best[i] || o !== best[i].o)));
+    }
     const enIdx = best.map((b, i) => (b && /[A-Za-z]/.test(b.text) && !/[가-힣]/.test(b.text) ? i : -1)).filter((i) => i >= 0);
     if (enIdx.length) { const er = await rt.recEn(enIdx.map((i) => best[i].view)); enIdx.forEach((i, k) => { best[i].text = er[k][0]; best[i].conf = er[k][1]; }); }
-    let calls = 1 + views.length + enIdx.length;
+    let calls = 1 + nRec + enIdx.length;
     EP.freeCanvas(...tmp);
     // 동그라미 속 권차(상/하 등)는 작아서 큰 글자 줄 8개 안에 못 듦 → 정사각형에 가까운 작은 글자 상자만 따로 읽음
     const inLines = new Set(lines.map((L) => L.p));
@@ -2646,7 +2673,8 @@ if (typeof module !== "undefined") module.exports = ER;
     });
     const titleLines = sel.map((L) => L.text), raw = titleLines.join(" ");
     const fixed = titleLines.map(libCorrectLine), spatial = fixed.join(" "), reordered = libBestOrder(fixed).join(" ");
-    const catScore = (q) => { const m = q ? matcher.match(q, 1, true) : []; return m.length && m[0].verified !== false ? m[0].score : 0; };
+    // 카탈로그 확정 기준(R.match)을 넘는 점수만 셈 — 카탈로그에 없는 책은 낮은 점수끼리의 차이로 어순이 뒤집히지 않게
+    const catScore = (q) => { const m = q ? matcher.match(q, 1, true) : []; return m.length && m[0].verified !== false && m[0].score >= R.match ? m[0].score : 0; };
     // 어순은 위→아래(읽는 순서)가 기본. 카탈로그 점수가 확실히 오를 때만 바꿈 (예: '부동산 교과서'를 '교과서 부동산'으로 뒤집지 않게)
     const corrected = reordered !== spatial && catScore(reordered) >= catScore(spatial) + R.reorderGain ? reordered : spatial;
     let hit = null;
@@ -2664,32 +2692,178 @@ if (typeof module !== "undefined") module.exports = ER;
     }
     const ocrOk = SP.normalize(corrected).length >= 2 && !SP.isGarbage(corrected);
     const [final, source] = hit ? [hit.title, "카탈로그"] : ocrOk ? [corrected, "OCR"] : ["Unknown", "-"];
-    return { title: hit ? hit.title : null, raw, corrected, score: hit ? hit.score : 0, final, source, calls, noText: !lines.length,
+    const dbg = lines.map((L) => ({ t: L.text || "", o: L.o, skip: L.skip || "", ang: +(L.r.ang * 180 / Math.PI).toFixed(0), cx: Math.round(L.r.cx), cy: Math.round(L.r.cy),
+      size: Math.round(size(L)), sel: sel.includes(L) }));   // 개발용: 줄마다 판단 근거 (window.__LIB_LAST)
+    return { dbg, title: hit ? hit.title : null, raw, corrected, score: hit ? hit.score : 0, final, source, calls, noText: !lines.length,
              view: `글자 줄 ${lines.length}개 · 제목 ${sel.length}줄` + (corrected !== raw ? ` · 교정 "${raw}" → "${corrected}"` : ""),
              textBoxes: lines.map((L) => ({ poly: L.p, text: L.text || "", selected: true, used: sel.includes(L) })) };
   }
-  async function computeL(img, p0, p1) {
-    const span = p1 - p0, step = (t) => setProgress(p0 + span * 0.02, `Liber(β1): ${t}`);
+  // ---- Liber(β2) 추가 모델: ③ 권수 확정 ViT(DeiT-Small INT8) · ④ 업스케일 FSRCNN (처음 쓸 때 한 번만 불러옴)
+  let L2RT = null;
+  async function ensureL2(step) {
+    if (L2RT) return L2RT;
+    step("③ 권수 확정 분류기(DeiT-Small INT8 23MB) 불러오는 중");
+    const meta = await (await fetch("liber_vit_labels.json")).json();
+    const vit = await createSession(await fetchBuf("liber_vit_small_int8.onnx"));
+    step("④ 업스케일(FSRCNN) 불러오는 중");
+    const sr = {};
+    for (const k of LIB.SR.scales) sr[k] = await createSession(await fetchBuf(`fsrcnn_x${k}.onnx`));
+    L2RT = { vit, meta, sr };
+    return L2RT;
+  }
+  // ③ ViT 입력: 비율을 지켜 줄이고 회색(114) 여백으로 224 정사각형 (노트북 Letterbox와 같음) → (x/255 - mean) / std
+  async function vitClassify(crop) {
+    const { vit, meta } = L2RT, S = meta.size, k = S / Math.max(crop.width, crop.height);
+    const w = Math.max(1, Math.round(crop.width * k)), h = Math.max(1, Math.round(crop.height * k));
+    const c = mk(S, S), g = c.getContext("2d");
+    g.fillStyle = `rgb(${meta.letterbox_fill},${meta.letterbox_fill},${meta.letterbox_fill})`; g.fillRect(0, 0, S, S);
+    g.imageSmoothingEnabled = true; g.drawImage(crop, Math.floor((S - w) / 2), Math.floor((S - h) / 2), w, h);
+    const d = g.getImageData(0, 0, S, S).data, n = S * S, f = new Float32Array(3 * n);
+    for (let i = 0; i < n; i++) for (let j = 0; j < 3; j++) f[j * n + i] = (d[i * 4 + j] / 255 - meta.mean[j]) / meta.std[j];
+    EP.freeCanvas(c);
+    const z = (await vit.run({ pixel_values: new ort.Tensor("float32", f, [1, 3, S, S]) })).logits.data;
+    const mx = Math.max(...z), e = Array.from(z, (v) => Math.exp(v - mx)), sum = e.reduce((a, v) => a + v, 0);
+    const bi = e.indexOf(Math.max(...e));
+    return [meta.labels[bi], e[bi] / sum];
+  }
+  // ④ FSRCNN: 책 폭(짧은 변)이 목표에 닿는 가장 작은 배율. 밝기(Y)만 FSRCNN으로 키우고 색(Cr·Cb)은 보간 그대로 (OpenCV dnn_superres와 같은 방식)
+  function srScale(crop) {
+    const { target, maxLong, scales } = LIB.SR, short = Math.min(crop.width, crop.height), long = Math.max(crop.width, crop.height);
+    if (short >= target) return 1;
+    for (const k of scales) {
+      if (long * k > maxLong) return k > scales[0] ? k - 1 : 1;
+      if (short * k >= target) return k;
+    }
+    return scales[scales.length - 1];
+  }
+  async function srUpscale(crop) {
+    const k = srScale(crop); if (k === 1) return { crop, k };
+    const W = crop.width, H = crop.height, d = crop.getContext("2d").getImageData(0, 0, W, H).data, y = new Float32Array(W * H);
+    for (let i = 0; i < W * H; i++) y[i] = (0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]) / 255;
+    const Y = (await L2RT.sr[k].run({ y: new ort.Tensor("float32", y, [1, 1, H, W]) })).sr.data;
+    const big = mk(W * k, H * k), g = big.getContext("2d");
+    g.imageSmoothingEnabled = true; if ("imageSmoothingQuality" in g) g.imageSmoothingQuality = "high"; g.drawImage(crop, 0, 0, W * k, H * k);
+    const id = g.getImageData(0, 0, W * k, H * k), q = id.data;
+    for (let i = 0; i < W * k * H * k; i++) {   // Cr·Cb를 그대로 두고 Y만 바꾸면 R·G·B가 같은 만큼 움직임
+      const dy = Math.min(255, Math.max(0, Y[i] * 255)) - (0.299 * q[i * 4] + 0.587 * q[i * 4 + 1] + 0.114 * q[i * 4 + 2]);
+      q[i * 4] += dy; q[i * 4 + 1] += dy; q[i * 4 + 2] += dy;   // Uint8ClampedArray라 0~255로 자동 제한
+    }
+    g.putImageData(id, 0, 0);
+    return { crop: big, k };
+  }
+  // 점들을 감싸는 회전 사각형으로 책 상자 만들기 (base의 나머지 정보는 그대로)
+  function rectBook(pts, base) {
+    const r = EP.minAreaRect(pts);
+    return { ...base, cx: r.cx, cy: r.cy, w: r.w, h: r.h, ang: r.ang, obb: true, poly: r.pts, bbox: EP.bboxOf(r.pts), short: Math.min(r.w, r.h) };
+  }
+  // multiple → n권: 책을 바로 세운 크롭에서 등분점 ± 35% 안에 세로 경계(가로 밝기 변화)가 가장 강한 곳을 자르는 위치로 (노트북 split_poly_snap)
+  function splitBook(img, bk, n, search = 0.35) {
+    const { crop, tf } = EP.cropUpright(img, bk), W = crop.width, H = crop.height;
+    const d = crop.getContext("2d").getImageData(0, 0, W, H).data, prof = new Float32Array(W);
+    for (let y = 0; y < H; y++) for (let x = 1; x < W - 1; x++) {
+      const l = (y * W + x - 1) * 4, r = (y * W + x + 1) * 4;
+      prof[x] += Math.abs(d[r] + d[r + 1] + d[r + 2] - d[l] - d[l + 1] - d[l + 2]);
+    }
+    EP.freeCanvas(crop);
+    const sm = prof.map((_, x) => (prof[Math.max(0, x - 1)] + prof[x] + prof[Math.min(W - 1, x + 1)]) / 3);
+    const cuts = [0], step = W / n;
+    for (let j = 1; j < n; j++) {
+      const lo = Math.floor(Math.max(cuts[cuts.length - 1] + 1, j * step - search * step)), hi = Math.floor(Math.min(W - 1, j * step + search * step));
+      let bx = j * step; if (hi > lo) { bx = lo; for (let x = lo; x <= hi; x++) if (sm[x] > sm[bx]) bx = x; }
+      cuts.push(bx);
+    }
+    cuts.push(W);
+    return cuts.slice(1).map((b, j) => rectBook([[cuts[j], 0], [b, 0], [b, H], [cuts[j], H]].map(tf), { ...bk, spiral: false }));
+  }
+  // ③ 권수 확정 (노트북 Cell 3-3 규칙. SAM 마스크 대신 회전 상자 다각형으로 겹침을 잼)
+  //  확신 < minConf → not_book 쪽이면 버림, 아니면 1권 / not_book 버림 / partial: 덮는 책이 있으면 같은 책, 없으면 확신 높을 때만 1권
+  //  multiple: 낱권 두께(book 판정 책등 폭 중앙값)로 2~6권으로 나눔 / 마지막에 겹치는 상자 정리
+  async function libChunk(img, books) {
+    const C = LIB.C, items = [], dropped = [];
+    for (let idx = 0; idx < books.length; idx++) {
+      const bk = books[idx];
+      if (bk.spiral) { items.push({ bk, idx, cls: "book", prob: 1, eff: "book" }); continue; }
+      const { crop } = EP.cropUpright(img, bk), [cls, prob] = await vitClassify(crop); EP.freeCanvas(crop);
+      let eff = prob >= C.minConf ? cls : cls === "not_book" ? "drop?" : "book?";
+      if (eff === "multiple" && bk.kind === "cover") eff = "book";   // 낱권 두께는 책등 기준이라 표지는 나누지 않음
+      items.push({ bk, idx, cls, prob, eff });
+    }
+    const area = (b) => EP.polyArea(b.poly), inter = (a, b) => EP.polyInter(a.poly, b.poly);
+    const ovSmall = (a, b) => inter(a, b) / Math.max(1e-6, Math.min(area(a), area(b)));
+    for (const it of items) if (it.eff === "not_book" || it.eff === "drop?") dropped.push({ ...it, why: "책 아님" });
+    const solid = items.filter((it) => ["book", "book?", "multiple"].includes(it.eff)), cands = [];
+    // partial: 서로 겹치는 조각끼리 묶음
+    const parts = items.filter((it) => it.eff === "partial"), root = parts.map((_, i) => i);
+    const find = (i) => (root[i] === i ? i : (root[i] = find(root[i])));
+    parts.forEach((a, i) => parts.forEach((b, j) => { if (j > i && ovSmall(a.bk, b.bk) >= C.overlap) root[find(i)] = find(j); }));
+    const groups = new Map(); parts.forEach((p, i) => { const r = find(i); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(p); });
+    for (const g of groups.values()) {
+      const tot = g.reduce((s, p) => s + area(p.bk), 0), best = g.reduce((a, b) => (b.prob > a.prob ? b : a));
+      const host = solid.find((h) => g.reduce((s, p) => s + inter(p.bk, h.bk), 0) / Math.max(1e-6, tot) >= C.overlap);
+      if (host) g.forEach((p) => dropped.push({ ...p, why: `조각 → ${host.idx + 1}번 책` }));
+      else if (best.prob < C.partialKeep) g.forEach((p) => dropped.push({ ...p, why: "애매한 조각" }));
+      else cands.push({ bk: g.length > 1 ? rectBook(g.flatMap((p) => p.bk.poly), best.bk) : best.bk, cls: "partial", prob: best.prob, ord: best.idx });
+    }
+    const singles = items.filter((it) => it.eff === "book" && it.bk.kind === "spine").map((it) => it.bk.short).sort((a, b) => a - b);
+    const ref = singles.length ? singles[Math.floor(singles.length / 2)] : 0;
+    let nSplit = 0;
+    for (const it of items) {
+      if (it.eff === "book" || it.eff === "book?") cands.push({ bk: it.bk, cls: it.eff, prob: it.prob, ord: it.idx });
+      else if (it.eff === "multiple") {
+        const n = ref ? Math.min(6, Math.max(2, Math.round(it.bk.short / ref))) : 2; nSplit++;
+        splitBook(img, it.bk, n).forEach((bk, k) => cands.push({ bk, cls: "multiple", prob: it.prob, ord: it.idx + (k + 1) / 10 }));
+      }
+    }
+    const PRI = { book: 0, partial: 1, "book?": 2, multiple: 3 }, SINGLE = new Set(["book", "book?", "partial"]), keep = [];
+    for (const c of cands.sort((a, b) => PRI[a.cls] - PRI[b.cls] || b.prob - a.prob)) {
+      const same = keep.find((k) => ovSmall(k.bk, c.bk) >= C.finalDup);
+      if (!same) keep.push(c);
+      else if (SINGLE.has(c.cls) && SINGLE.has(same.cls) && area(c.bk) > area(same.bk)) { dropped.push({ ...same, why: "중복" }); keep[keep.indexOf(same)] = c; }
+      else dropped.push({ ...c, why: "중복" });
+    }
+    keep.sort((a, b) => a.ord - b.ord);
+    return { books: keep.map((c) => ({ ...c.bk, vit: c.cls, vitP: c.prob })), dropped, nSplit, verdicts: items.map((it) => `${it.idx + 1}:${it.cls} ${it.prob.toFixed(2)}`) };
+  }
+  // v2 = false → Liber(β1), true → Liber(β2: ③ 권수 확정 + ④ 업스케일 + 책 단위 방향)
+  async function computeL(img, p0, p1, v2 = false) {
+    const tag = v2 ? "Liber(β2)" : "Liber(β1)", span = p1 - p0, step = (t) => setProgress(p0 + span * 0.02, `${tag}: ${t}`);
     const rt = await ensureE(step); libLex();
+    if (v2) await ensureL2(step);
     const t0 = performance.now();
-    setProgress(p0 + span * 0.05, "Liber(β1): ① 책 검출 중"); await new Promise((r) => setTimeout(r, 0));
-    const { books: found } = await EP.detectBooks(img, rt);
+    setProgress(p0 + span * 0.05, `${tag}: ① 책 검출 중`); await new Promise((r) => setTimeout(r, 0));
+    let { books: found } = await EP.detectBooks(img, rt), chunk = null;
+    const nDet = found.length;
+    if (v2) {
+      setProgress(p0 + span * 0.1, `${tag}: ③ 권수 확정 중 (ViT)`); await new Promise((r) => setTimeout(r, 0));
+      chunk = await libChunk(img, found); found = chunk.books;
+    }
     const tDet = performance.now() - t0, books = [];
+    let nSr = 0;
     for (let i = 0; i < found.length; i++) {
-      setProgress(p0 + span * (0.15 + 0.85 * i / Math.max(1, found.length)), `Liber(β1): ⑤~⑨ 제목 읽는 중 ${i + 1}/${found.length}`);
+      setProgress(p0 + span * (0.15 + 0.85 * i / Math.max(1, found.length)), `${tag}: ${v2 ? "④" : "⑤"}~⑨ 제목 읽는 중 ${i + 1}/${found.length}`);
       await new Promise((r) => setTimeout(r, 0));
       const bk = found[i]; let r;
       if (bk.spiral) r = { title: null, raw: "", corrected: "", score: 0, final: "Unknown", source: "스프링 노트", view: "스프링 제본", calls: 0, noText: true, textBoxes: [] };
-      else { const { crop, tf } = EP.cropBook(img, bk, AB.src); r = await libReadBook(crop, rt, bk.kind); EP.freeCanvas(crop); r.textBoxes = r.textBoxes.map((b) => ({ ...b, poly: b.poly.map(tf) })); }
+      else {
+        const { crop, tf } = EP.cropBook(img, bk, AB.src);
+        const up = v2 ? await srUpscale(crop) : { crop, k: 1 }; if (up.k > 1) nSr++;
+        r = await libReadBook(up.crop, rt, bk.kind, v2);
+        EP.freeCanvas(crop); if (up.crop !== crop) EP.freeCanvas(up.crop);
+        r.textBoxes = r.textBoxes.map((b) => ({ ...b, poly: b.poly.map(([x, y]) => tf([x / up.k, y / up.k])) }));
+        if (up.k > 1) r.view += ` · FSRCNN x${up.k}`;
+      }
       books.push({ ...bk, ...r });
     }
-    const R = { books, tDet, tAll: performance.now() - t0, calls: books.reduce((s, b) => s + b.calls, 0) };
-    setProgress(p1, "Liber(β1): 완료");
-    logLine(`Liber(β1) 결과: ${books.length}권 · 검출 ${(R.tDet / 1000).toFixed(1)}초 · 전체 ${(R.tAll / 1000).toFixed(1)}초 · 인식 호출 ${R.calls}회`);
+    const R = { books, tDet, tAll: performance.now() - t0, calls: books.reduce((s, b) => s + b.calls, 0), nDet, chunk, nSr };
+    window.__LIB_LAST = books.map((b, i) => ({ no: i + 1, final: b.final, raw: b.raw, corrected: b.corrected, dbg: b.dbg, vit: b.vit }));
+    if (v2) window.__LIB2_CHUNK = { verdicts: chunk.verdicts, dropped: chunk.dropped.map((d) => `${d.idx + 1}:${d.cls} ${d.prob.toFixed(2)} → ${d.why}`), nSplit: chunk.nSplit, nSr };
+    setProgress(p1, `${tag}: 완료`);
+    logLine(`${tag} 결과: ${books.length}권` + (v2 ? ` (검출 ${nDet} → ③ 버림 ${chunk.dropped.length} · 나눔 ${chunk.nSplit} · ④ 업스케일 ${nSr}권)` : "") +
+      ` · 검출 ${(R.tDet / 1000).toFixed(1)}초 · 전체 ${(R.tAll / 1000).toFixed(1)}초 · 인식 호출 ${R.calls}회`);
     const rows = books.map((b) => ({ title: b.final !== "Unknown" ? b.final : null, src: b.source, kind: b.kind, noText: b.noText, spiral: b.source === "스프링 노트", raw: b.raw || "", view: b.view }));
     return { ...R, boxes: books, rows };
   }
-  const AB = { A: null, B: null, D: null, E: null, L: null, img: null, view: "E", eView: 3 };
+  const AB = { A: null, B: null, D: null, E: null, L: null, L2: null, img: null, view: "L", eView: 3 };
   // ---- PaddleOCR PP-OCRv5 한국어 인식기 (rten WASM) ----
   let PP = null, rtenReady = false;
   async function initRten() { if (!rtenReady) { RTEN.initSync({ module: await fetchBuf("rten.wasm") }); rtenReady = true; } }
@@ -2782,10 +2956,11 @@ if (typeof module !== "undefined") module.exports = ER;
     const M = AB.view, R = AB[M]; if (!R) return; const f = AB.filter || "all", show = R.rows.map((r) => pass(r, f));
     $("eViews").hidden = M !== "E";
     if (M === "E") drawE(AB.eView, show);
-    else if (M === "L") {
+    else if (M === "L" || M === "L2") {
       drawE(3, show, R);
       const nCat = R.books.filter((b) => b.source === "카탈로그").length, nOcr = R.books.filter((b) => b.source === "OCR").length;
-      $("cvCap").textContent = `Liber(β1) 결과: 제목 인식 ${nCat + nOcr} / ${R.books.length}권 (카탈로그 확정 ${nCat} · 글자로 읽은 제목 ${nOcr}) · 전체 ${(R.tAll / 1000).toFixed(1)}초`;
+      $("cvCap").textContent = `${CONFIGS[M].label} 결과: 제목 인식 ${nCat + nOcr} / ${R.books.length}권 (카탈로그 확정 ${nCat} · 글자로 읽은 제목 ${nOcr}) · 전체 ${(R.tAll / 1000).toFixed(1)}초` +
+        (R.chunk ? ` · ③ 검출 ${R.nDet} → 버림 ${R.chunk.dropped.length} · 나눔 ${R.chunk.nSplit} · ④ 업스케일 ${R.nSr}권` : "");
     } else { $("cvCap").hidden = true; $("cvLeg").hidden = true; drawImage(AB.img, R.boxes, R.rows.map((r) => !!r.title), show); }
   }
   for (const [id, v] of [["ev1", 1], ["ev2", 2], ["ev3", 3]]) $(id).addEventListener("click", () => {
@@ -2845,7 +3020,7 @@ if (typeof module !== "undefined") module.exports = ER;
   $("f_ok").addEventListener("click", () => setFilter("ok"));
   $("f_no").addEventListener("click", () => setFilter("no"));
 
-  // ---- 최종모델(E) · Liber(β1) 비교표: 두 모델은 같은 검출기를 써서 책 상자가 같음 → 상자가 겹치는 책끼리 한 줄로
+  // ---- Liber(β1) · Liber(β2) 비교표: 같은 검출기에서 출발 → 상자가 겹치는 책끼리 한 줄로 (β2에서 버리거나 나눈 책은 한쪽만)
   const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const srcName = (b) => ({ "카탈로그": "카탈로그 확정", "OCR": "글자로 읽음", "스프링 노트": "스프링 노트" }[b.source] || "");
   const titleOf = (b) => (b && b.final && b.final !== "Unknown" ? b.final : null);
@@ -2865,10 +3040,10 @@ if (typeof module !== "undefined") module.exports = ER;
     return pairs.sort((a, b) => (a[0] ?? a[1] + 0.5) - (b[0] ?? b[1] + 0.5));
   }
   function renderELCompare() {
-    const E = AB.E, L = AB.L;
+    const E = AB.L, L = AB.L2;
     $("elCmp").hidden = false;
     if (!E || !L) {
-      const miss = !E ? "E" : "L";
+      const miss = !E ? "L" : "L2";
       $("elNote").textContent = `${CONFIGS[miss].label} 결과가 아직 없습니다. 아래 버튼을 누르면 같은 사진을 인식해 비교표를 만듭니다.`;
       $("elRun").hidden = false; $("elRun").textContent = `${CONFIGS[miss].label}로도 인식해 비교하기`; $("elRun").dataset.model = miss;
       $("elSumWrap").hidden = $("elTblWrap").hidden = $("elCopy").hidden = true;
@@ -2877,24 +3052,25 @@ if (typeof module !== "undefined") module.exports = ER;
     $("elRun").hidden = true; $("elSumWrap").hidden = $("elTblWrap").hidden = $("elCopy").hidden = false;
     const stat = (X) => { const c = X.books.filter((b) => b.source === "카탈로그").length, o = X.books.filter((b) => b.source === "OCR").length;
       return [X.books.length + "권", c + o + "권", c + "권", o + "권", (X.tAll / 1000).toFixed(1) + "초", X.calls + "회"]; };
-    const se = stat(E).concat(modelMB("E").toFixed(1) + "MB"), sl = stat(L).concat(modelMB("L").toFixed(1) + "MB (E와 공유)");
+    const se = stat(E).concat(modelMB("L").toFixed(1) + "MB"), sl = stat(L).concat(modelMB("L2").toFixed(1) + "MB");
     $("elSum").innerHTML = ["감지된 책", "제목 확인", "· 카탈로그 확정", "· 글자로 읽은 제목", "전체 소요시간", "글자 인식 호출", "모델 용량"]
       .map((k, i) => `<tr><td>${k}</td><td class="n">${se[i]}</td><td class="n">${sl[i]}</td></tr>`).join("");
     const rows = pairBooks(E, L).map(([i, j]) => {
       const e = i === null ? null : E.books[i], l = j === null ? null : L.books[j], te = titleOf(e), tl = titleOf(l), b = e || l;
-      const verdict = !e || !l ? ["한쪽만 검출", "diff"] : te && tl ? (sameTitle(te, tl) ? ["같음", "same"] : ["다름", "diff"])
-        : te ? ["E만 인식", "diff"] : tl ? ["Liber만 인식", "diff"] : ["둘 다 미인식", "none"];
+      const verdict = !e ? ["β2만 (나눈 책)", "diff"] : !l ? ["β1만 (β2가 버림·합침)", "diff"] : te && tl ? (sameTitle(te, tl) ? ["같음", "same"] : ["다름", "diff"])
+        : te ? ["β1만 인식", "diff"] : tl ? ["β2만 인식", "diff"] : ["둘 다 미인식", "none"];
       return { no: i !== null ? i + 1 : `L${j + 1}`, kind: b.kind === "cover" ? "표지" : "책등", e, l, te, tl, verdict };
     });
     const cell = (b, t) => (!b ? `<td class="none">검출 안 됨</td>` : `<td>${t ? esc(t) : "미인식"}<small>${srcName(b)}</small></td>`);
     $("elBody").innerHTML = rows.map((r) => `<tr><td class="n">${r.no}</td><td>${r.kind}</td>${cell(r.e, r.te)}${cell(r.l, r.tl)}<td class="${r.verdict[1]}">${r.verdict[0]}</td></tr>`).join("");
     const n = (v) => rows.filter((r) => r.verdict[0] === v).length;
-    $("elNote").textContent = `책 ${rows.length}권: 같음 ${n("같음")} · 다름 ${n("다름")} · E만 인식 ${n("E만 인식")} · Liber만 인식 ${n("Liber만 인식")} · 둘 다 미인식 ${n("둘 다 미인식")}` + (n("한쪽만 검출") ? ` · 한쪽만 검출 ${n("한쪽만 검출")}` : "");
+    $("elNote").textContent = `β1 책 ${E.books.length}권 · β2 책 ${L.books.length}권 — 같음 ${n("같음")} · 다름 ${n("다름")} · β1만 인식 ${n("β1만 인식")} · β2만 인식 ${n("β2만 인식")} · 둘 다 미인식 ${n("둘 다 미인식")}` +
+      (n("β1만 (β2가 버림·합침)") ? ` · β2가 버림·합침 ${n("β1만 (β2가 버림·합침)")}` : "") + (n("β2만 (나눈 책)") ? ` · β2가 나눈 책 ${n("β2만 (나눈 책)")}` : "");
     AB.elRows = rows;
   }
   $("elRun").addEventListener("click", () => openModel($("elRun").dataset.model));
   $("elCopy").addEventListener("click", async () => {   // 보고서·스프레드시트에 붙여 넣기 좋게 탭 구분
-    const lines = [["번호", "종류", "최종모델(E)", "E 출처", "Liber(β1)", "Liber 출처", "비교"].join("\t")]
+    const lines = [["번호", "종류", "Liber(β1)", "β1 출처", "Liber(β2)", "β2 출처", "비교"].join("\t")]
       .concat((AB.elRows || []).map((r) => [r.no, r.kind, r.te || (r.e ? "미인식" : "검출 안 됨"), r.e ? srcName(r.e) : "", r.tl || (r.l ? "미인식" : "검출 안 됨"), r.l ? srcName(r.l) : "", r.verdict[0]].join("\t")));
     try { await navigator.clipboard.writeText(lines.join("\n")); $("elCopy").textContent = "복사됨"; setTimeout(() => ($("elCopy").textContent = "비교표 복사"), 1500); }
     catch (_) { $("elCopy").textContent = "복사 실패"; }
@@ -2903,13 +3079,13 @@ if (typeof module !== "undefined") module.exports = ER;
   function renderModel(M) {
     const R = AB[M]; if (!R) return;
     AB.view = M;
-    for (const k of ["D", "E", "L"]) { const t = $("tab" + k); t.classList.toggle("on", k === M); t.setAttribute("aria-selected", String(k === M)); }
+    for (const k of ["L", "L2"]) { const t = $("tab" + k); t.classList.toggle("on", k === M); t.setAttribute("aria-selected", String(k === M)); }
     $("cv").hidden = false;
-    $("spec").innerHTML = M === "L" ? liberSpecHtml() : `<dt class="h">${CONFIGS[M].label} 적용 모델</dt>` + sizeRow(M) + SPEC[M].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+    $("spec").innerHTML = M === "L" || M === "L2" ? liberSpecHtml(M) : `<dt class="h">${CONFIGS[M].label} 적용 모델</dt>` + sizeRow(M) + SPEC[M].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
     const f = AB.filter || "all";
     redraw(); renderList(R.rows, f); $("res").hidden = false;
     $("cmp").innerHTML = "";
-    for (const k of ["E", "L", "D"]) {
+    for (const k of ["L", "L2"]) {
       const X = AB[k]; if (!X) continue;
       const d = document.createElement("div"); if (k === M) d.className = "on";
       const ok = X.rows.filter((r) => r.title).length, n = X.boxes.length, sec = (ms) => (ms / 1000).toFixed(2);
@@ -2924,13 +3100,13 @@ if (typeof module !== "undefined") module.exports = ER;
     if (!AB[M]) {
       busy = true; let wake = null; try { wake = await navigator.wakeLock?.request("screen"); } catch (_) {}
       showProgress(`${CONFIGS[M].label}로 인식 중입니다.\n잠시만 기다려주세요.`);
-      try { AB[M] = M === "E" ? await computeE(AB.img, 0, 1) : M === "L" ? await computeL(AB.img, 0, 1) : await processModel(AB.img, M, 0, 1); saveRun(M); }
+      try { AB[M] = M === "E" ? await computeE(AB.img, 0, 1) : M === "L" || M === "L2" ? await computeL(AB.img, 0, 1, M === "L2") : await processModel(AB.img, M, 0, 1); saveRun(M); }
       catch (e) { logError($("pmStep").textContent, e); $("dst").hidden = false; $("dst").textContent = `인식 실패 [${$("pmStep").textContent}] ${e && e.message ? e.message : e} · 아래 실행 로그를 확인해 주세요`; }
       finally { hideProgress(); try { await wake?.release(); } catch (_) {} busy = false; }
     }
     renderModel(M);
   }
-  for (const M of ["D", "E", "L"]) $("tab" + M).addEventListener("click", () => openModel(M));
+  for (const M of ["L", "L2"]) $("tab" + M).addEventListener("click", () => openModel(M));
   async function saveRun(M) {
     try {
       const db = await claude.use("db"); if (!db) return; const X = AB[M];
@@ -2977,10 +3153,10 @@ if (typeof module !== "undefined") module.exports = ER;
       const img = mk(Math.round(iw * k), Math.round(ih * k)); img.getContext("2d").drawImage(src, 0, 0, img.width, img.height);
       AB.img = img; AB.src = src;   // src: 원본 사진 (글자 읽기용 크롭)
       AB.filter = "all";
-      AB.E = await computeE(img, 0, 1);
-      $("abWrap").hidden = false; $("cv").hidden = false; AB.eView = 3; renderModel("E");
+      AB.L = await computeL(img, 0, 1);
+      $("abWrap").hidden = false; $("cv").hidden = false; AB.eView = 3; renderModel("L");
       $("dst").hidden = true;
-      saveRun("E");
+      saveRun("L");
     } catch (e) { logError($("pmStep").textContent, e); $("dst").hidden = false; $("dst").textContent = `인식 실패 [${$("pmStep").textContent}] ${e && e.message ? e.message : e} · 아래 실행 로그를 확인해 주세요`; }
     finally { hideProgress(); try { await wake?.release(); } catch (_) {} busy = false; $("abWrap").scrollIntoView({ block: "start", behavior: "smooth" }); }
   }
@@ -2995,12 +3171,12 @@ if (typeof module !== "undefined") module.exports = ER;
   });
   function reset1() {
     if (busy) return;
-    AB.A = AB.B = AB.D = AB.E = AB.L = AB.img = AB.src = null; AB.view = "E"; AB.eView = 3; AB.elRows = null;
+    AB.A = AB.B = AB.D = AB.E = AB.L = AB.L2 = AB.img = AB.src = null; AB.view = "L"; AB.eView = 3; AB.elRows = null;
     $("elCmp").hidden = true;
     for (const [j, w] of [["ev1", 1], ["ev2", 2], ["ev3", 3]]) { $(j).classList.toggle("on", w === 3); $(j).setAttribute("aria-selected", String(w === 3)); }
     $("eViews").hidden = true; $("cvCap").hidden = true; $("cvLeg").hidden = true;
     $("abWrap").hidden = true; $("cv").hidden = true; $("res").hidden = true; $("rList").innerHTML = ""; $("cmp").innerHTML = ""; $("dst").hidden = false;
-    $("dst").textContent = "사진을 넣으면 최종모델(E)로 인식합니다. 다른 모델 탭을 누르면 같은 사진을 그 모델로 인식해 비교합니다.";
+    $("dst").textContent = "사진을 넣으면 Liber(β1)로 인식합니다. Liber(β2) 탭을 누르면 같은 사진을 β2로 인식해 비교합니다.";
   }
   $("reset1").addEventListener("click", reset1);
   $("reset2").addEventListener("click", () => {
