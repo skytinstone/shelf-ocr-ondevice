@@ -941,7 +941,7 @@ const DEVICES = [
 ].map(([group, name, chip, ram, year, reported]) => ({ group, name, chip, ram, year, reported: !!reported }));
 
 // 앱 버전: 최종 제출 전까지 0.x 유지, 패치마다 0.10 → 0.11 → 0.12 … 로 하나씩 올림
-const APP_VERSION = "0.15", APP_UPDATED = "2026-10-23 10:27 (KST)";
+const APP_VERSION = "0.16", APP_UPDATED = "2026-10-23 11:38 (KST)";
 
 // 최종모델(E) 용량 · 메모리 (MB). 검출기는 직접 학습한 YOLO11n-OBB (책등·표지 2클래스, 40에포크)
 const MODEL_INFO = {
@@ -1532,6 +1532,8 @@ const EP = (() => {
     }
     return false;
   }
+  // 상자가 닿은 사진 변의 수 (tol: 짧은 변 대비 여유)
+  const frameSides = (b, W, H, tol = 0.01) => { const t = tol * Math.min(W, H); return (b[0] <= t) + (b[1] <= t) + (b[2] >= W - t) + (b[3] >= H - t); };
   function dedupeBooks(books, iou, inside) {
     const ar = books.map((b) => polyArea(b.poly)), order = books.map((_, i) => i).sort((i, j) => books[j].score - books[i].score), keep = [];
     for (const i of order) if (keep.every((j) => { const I = polyInter(books[i].poly, books[j].poly); return I < iou * (ar[i] + ar[j] - I); })) keep.push(i);
@@ -1554,7 +1556,14 @@ const EP = (() => {
       if (bk.kind === "spine") {
         await breathe();
         const { crop } = cropUpright(img, bk);
-        bk.spiral = spiralScore(crop) >= 0.2 && (await rt.textDet(crop)).length <= 1;
+        // 사진 세 변 이상에 닿은 책등 후보 = 책 옆 빈 배경(책상 나무결 등)을 세로 띠로 잘못 잡은 경우가 많음
+        //  → 글자가 하나도 없으면 버림 (가장자리에 걸린 진짜 책등은 보통 글자가 있어 남음)
+        let nText = null;
+        if (frameSides(bk.bbox, img.width, img.height) >= 3) {
+          nText = (await rt.textDet(crop)).length;
+          if (nText === 0) { free(crop); continue; }
+        }
+        bk.spiral = spiralScore(crop) >= 0.2 && (nText ?? (await rt.textDet(crop)).length) <= 1;
         free(crop);
       }
       books.push(bk);
@@ -2418,6 +2427,17 @@ if (typeof module !== "undefined") module.exports = ER;
     E: { label: "최종모델(E)" },
     L: { label: "Liber(β1)" },
   };
+  // 탭마다 내려받는 모델 파일 용량(MB, 실제 파일에서 잰 값 · base64 해독 후) — 설명 칸·모델 카드·비교표에 표시
+  const ENGINE_MB = [["ONNX Runtime WASM", 11.25], ["rten WASM", 2.54]];
+  const MODEL_SIZE = {
+    D: { parts: [["책등 검출 640", 3.18], ["원거리 재검출 1280", 3.49], ["한국어 인식", 13.5]], note: "원거리 재검출은 멀리서 찍은 사진에서만 불러옴" },
+    E: { parts: [["책 검출", 10.96], ["글자 검출", 4.87], ["한국어 인식", 13.5], ["영어 인식", 7.93]] },
+    L: { parts: [["책 검출", 10.96], ["글자 검출", 4.87], ["한국어 인식", 13.5], ["영어 인식", 7.93]], note: "최종모델(E)과 같은 파일을 함께 씀 → E를 쓴 뒤라면 추가 다운로드 0MB" },
+  };
+  const modelMB = (M) => MODEL_SIZE[M].parts.reduce((a, [, v]) => a + v, 0);
+  const engineMB = ENGINE_MB.reduce((a, [, v]) => a + v, 0);
+  const sizeRow = (M) => `<dt>모델 용량</dt><dd><b>${modelMB(M).toFixed(1)}MB</b> (${MODEL_SIZE[M].parts.map(([k, v]) => `${k} ${v.toFixed(1)}`).join(" · ")})` +
+    ` + 실행 엔진 ${engineMB.toFixed(1)}MB${MODEL_SIZE[M].note ? `<br><small>${MODEL_SIZE[M].note}</small>` : ""}</dd>`;
   // 탭마다 적용된 모델 구성 (인식 후 표시)
   const SPEC = {
     A: [["책등 검출", "YOLO11n-OBB · 1280 입력 고정 · INT8 3.5MB"], ["글자 인식", "EasyOCR 한국어 (korean_g2, CRNN+CTC) · INT8 10.4MB"], ["제목 확정", "매칭 점수 72 이상이면 바로 확정 · 3방향 모두 판독"], ["실행 엔진", "ONNX Runtime Web (WASM)"]],
@@ -2447,7 +2467,7 @@ if (typeof module !== "undefined") module.exports = ER;
     ["⑨ 제목 확정", "규칙 + 글자 5-gram + 카탈로그", "ok", "저자·판수·잘린 줄 제외 → 단어 교정·어순 → 카탈로그 확정 (모두 비신경망)"],
   ];
   function liberSpecHtml() {
-    return `<dt class="h">Liber(β1 · Liber-lite) 적용 모델</dt>` +
+    return `<dt class="h">Liber(β1 · Liber-lite) 적용 모델</dt>` + sizeRow("L") +
       `<dd class="note2"><img src="liber_arch.png" alt="Liber 모델 아키텍처" style="display:block;width:100%;max-width:560px;margin:4px auto 8px;border:1px solid var(--line);border-radius:8px;background:#fff"></dd>` +
       LIBER_SPEC.map(([b, m, st, note]) => `<dt>${b}</dt><dd><span class="st ${st}">${LIBER_ST[st]}</span>${m}<br><small>${note}</small></dd>`).join("") +
       `<dd class="note2">β1은 새 모델을 받지 않습니다. 책 검출과 글자 인식은 최종모델(E)의 모델을 빌려 쓰고, Liber에서 새로 만든 줄 단위 방향·세로쓰기 판별, 글자 줄 정렬, 비신경망 제목 교정을 적용합니다. ②③④는 β2·β3에서 추가합니다.</dd>`;
@@ -2455,10 +2475,14 @@ if (typeof module !== "undefined") module.exports = ER;
 
   const LIB = {
     R: { maxLines: 8, vertical: 1.3, pad: 0.15, minConf: 0.5, sizeRatio: 0.6, maxTitle: 4, edge: 0.02, match: 75,
+         coverRatio: 0.75, coverMaxTitle: 3,     // 표지: 비슷한 크기의 광고 문구가 많아 더 엄격하게
+         numRatio: 0.75,                         // 숫자만 있는 줄(2027 등)도 이만큼 크면 제목에 포함
+         lineMatch: 88, reorderGain: 10,         // 제목 줄이 아닌 줄의 카탈로그 확정 점수 · 어순을 바꾸려면 필요한 카탈로그 점수 상승
          n: 5, maxEdit: 2, editRatio: 0.25, minJamo: 5, errW: 4.0, beam: 8, cands: 5, orderMargin: 0.1 },
     lex: null,
   };
-  const LIB_AUTHOR = /(지음|지은이|옮김|공역|편역|편저|감수|역|저|著)\s*$|^[가-힣]{2,4}\s*[·•+∙,]\s*[가-힣]{2,4}|[《〈(\[]\s*(공?역|공?저|편|감수|옮김)\s*[》〉)\]]|^.{0,3}수\s*:/;
+  const LIB_AUTHOR = /(지음|지은이|옮김|공역|편역|편저|감수|역|저|著)\s*$|^[가-힣]{2,4}\s*[·•+∙,]\s*[가-힣]{2,4}|[《〈(\[]\s*(공?역|공?저|편|감수|옮김)\s*[》〉)\]]|^.{0,3}수\s*:|^([가-힣]{3}\s+){2,}[가-힣]{3}$/;   // 마지막: 줄 전체가 세 글자 이름 3개 이상 (구분 기호가 빠진 저자 목록)
+  const LIB_VOLUME = /^(상|중|하|[1-9])$/;   // 동그라미 속 권차 한 글자
   const LIB_EDITION = /^(제?\s*\d+\s*판|개정\s*\d*\s*판|전면\s*개정판|\d+(st|nd|rd|th)?\s*edition|edition)$/i;
   const libClean = (t) => t.trim().replace(/\s+/g, " ").replace(/^[^0-9A-Za-z가-힣]+|[^0-9A-Za-z가-힣]+$/g, "");
 
@@ -2550,7 +2574,7 @@ if (typeof module !== "undefined") module.exports = ER;
   }
 
   // 책 1권: ⑤ 글자 줄 → ⑦ 펴기·CLAHE → ⑥ 방향 후보 인식 → ⑨ 제목 조립·교정·카탈로그
-  async function libReadBook(crop, rt) {
+  async function libReadBook(crop, rt, kind) {
     const R = LIB.R, W = crop.width;
     const lines = (await rt.textDet(crop)).map((p) => ({ p, r: EP.minAreaRect(p) })).filter((x) => Math.min(x.r.w, x.r.h) >= 6)
       .sort((a, b) => Math.min(b.r.w, b.r.h) - Math.min(a.r.w, a.r.h)).slice(0, R.maxLines);
@@ -2570,19 +2594,39 @@ if (typeof module !== "undefined") module.exports = ER;
     const edge = R.edge * W, read = [];
     lines.forEach((L, i) => {
       const b = best[i]; if (!b) { L.skip = "인식 없음"; return; }
-      const t = libClean(b.text), xs = L.p.map((q) => q[0]); L.text = t;
-      L.skip = b.conf < R.minConf ? "신뢰도" : !/[A-Za-z가-힣]/.test(t) ? "숫자·기호" : Math.min(...xs) <= edge || Math.max(...xs) >= W - 1 - edge ? "경계 잘림"
-        : SP.isGarbage(t) ? "잡음" : LIB_EDITION.test(t) ? "판수" : LIB_AUTHOR.test(t) ? "저자" : !EP.stripNonTitle(t, SP) ? "출판사·시리즈" : "";
+      const t = libClean(b.text), xs = L.p.map((q) => q[0]), ys = L.p.map((q) => q[1]); L.text = t;
+      // 경계 잘림 = 책등을 가로지르는 가로 줄이 좌우 경계에 닿은 경우만 (책등을 따라 세로로 쓴 큰 제목은 폭을 꽉 채워도 남김)
+      const across = Math.max(...xs) - Math.min(...xs) >= Math.max(...ys) - Math.min(...ys);
+      L.num = b.conf >= R.minConf && /^\d{2,4}$/.test(t);   // 연도·권 번호 → 크면 아래에서 제목에 포함
+      L.skip = b.conf < R.minConf ? "신뢰도" : !/[A-Za-z가-힣]/.test(t) ? "숫자·기호" : across && (Math.min(...xs) <= edge || Math.max(...xs) >= W - 1 - edge) ? "경계 잘림"
+        : SP.isGarbage(t) ? "잡음" : LIB_EDITION.test(t) ? "판수"
+        : LIB_AUTHOR.test(t) && !((matcher.match(t, 1, false)[0] || {}).score >= 90) ? "저자"   // 카탈로그 제목과 거의 같으면 저자 규칙 예외 (예: 변신·시골의사)
+        : !EP.stripNonTitle(t, SP) ? "출판사·시리즈" : "";
       if (!L.skip) read.push(L);
     });
-    const top = read.length ? Math.max(...read.map((L) => Math.min(L.r.w, L.r.h))) : 0;
-    const sel = read.filter((L) => Math.min(L.r.w, L.r.h) >= R.sizeRatio * top).sort((a, b) => a.r.cy - b.r.cy || a.r.cx - b.r.cx).slice(0, R.maxTitle);
-    const titleLines = sel.map((L) => L.text), raw = titleLines.join(" "), corrected = libBestOrder(titleLines.map(libCorrectLine)).join(" ");
+    const size = (L) => Math.min(L.r.w, L.r.h);
+    const top = read.length ? Math.max(...read.map(size)) : 0;
+    const ratio = kind === "cover" ? R.coverRatio : R.sizeRatio, maxT = kind === "cover" ? R.coverMaxTitle : R.maxTitle;
+    const nums = lines.filter((L) => L.num && top && size(L) >= R.numRatio * top);
+    const sel = read.filter((L) => size(L) >= ratio * top).sort((a, b) => size(b) - size(a)).slice(0, maxT).concat(nums)
+      .sort((a, b) => a.r.cy - b.r.cy || a.r.cx - b.r.cx);
+    const titleLines = sel.map((L) => L.text), raw = titleLines.join(" ");
+    const fixed = titleLines.map(libCorrectLine), spatial = fixed.join(" "), reordered = libBestOrder(fixed).join(" ");
+    const catScore = (q) => { const m = q ? matcher.match(q, 1, true) : []; return m.length && m[0].verified !== false ? m[0].score : 0; };
+    // 어순은 위→아래(읽는 순서)가 기본. 카탈로그 점수가 확실히 오를 때만 바꿈 (예: '부동산 교과서'를 '교과서 부동산'으로 뒤집지 않게)
+    const corrected = reordered !== spatial && catScore(reordered) >= catScore(spatial) + R.reorderGain ? reordered : spatial;
     let hit = null;
-    for (const q of [...new Set([corrected, raw, ...titleLines])]) {
+    const vols = [...new Set(lines.map((L) => libClean(L.text || "")).filter((t) => LIB_VOLUME.test(t)))];
+    const base = [...new Set([corrected, raw, ...titleLines])];
+    for (const q of base.concat(base.flatMap((q) => vols.map((v) => `${q} ${v}`)))) {
       if (!q.trim()) continue;
       const m = matcher.match(q, 3, true);
       if (m.length && m[0].verified !== false && m[0].score >= R.match && (!hit || m[0].score > hit.score)) hit = m[0];
+    }
+    for (const L of read) {   // 표지의 카탈로그 제목이 가장 큰 글씨가 아닌 경우 (예: Atomic Habits 표지의 '아주 작은 습관의 힘')
+      if (sel.includes(L) || SP.normalize(L.text).length < 3) continue;
+      const m = matcher.match(L.text, 3, true);
+      if (m.length && m[0].verified !== false && m[0].score >= R.lineMatch && (!hit || m[0].score > hit.score)) hit = m[0];
     }
     const ocrOk = SP.normalize(corrected).length >= 2 && !SP.isGarbage(corrected);
     const [final, source] = hit ? [hit.title, "카탈로그"] : ocrOk ? [corrected, "OCR"] : ["Unknown", "-"];
@@ -2602,7 +2646,7 @@ if (typeof module !== "undefined") module.exports = ER;
       await new Promise((r) => setTimeout(r, 0));
       const bk = found[i]; let r;
       if (bk.spiral) r = { title: null, raw: "", corrected: "", score: 0, final: "Unknown", source: "스프링 노트", view: "스프링 제본", calls: 0, noText: true, textBoxes: [] };
-      else { const { crop, tf } = EP.cropBook(img, bk, AB.src); r = await libReadBook(crop, rt); EP.freeCanvas(crop); r.textBoxes = r.textBoxes.map((b) => ({ ...b, poly: b.poly.map(tf) })); }
+      else { const { crop, tf } = EP.cropBook(img, bk, AB.src); r = await libReadBook(crop, rt, bk.kind); EP.freeCanvas(crop); r.textBoxes = r.textBoxes.map((b) => ({ ...b, poly: b.poly.map(tf) })); }
       books.push({ ...bk, ...r });
     }
     const R = { books, tDet, tAll: performance.now() - t0, calls: books.reduce((s, b) => s + b.calls, 0) };
@@ -2799,8 +2843,8 @@ if (typeof module !== "undefined") module.exports = ER;
     $("elRun").hidden = true; $("elSumWrap").hidden = $("elTblWrap").hidden = $("elCopy").hidden = false;
     const stat = (X) => { const c = X.books.filter((b) => b.source === "카탈로그").length, o = X.books.filter((b) => b.source === "OCR").length;
       return [X.books.length + "권", c + o + "권", c + "권", o + "권", (X.tAll / 1000).toFixed(1) + "초", X.calls + "회"]; };
-    const se = stat(E), sl = stat(L);
-    $("elSum").innerHTML = ["감지된 책", "제목 확인", "· 카탈로그 확정", "· 글자로 읽은 제목", "전체 소요시간", "글자 인식 호출"]
+    const se = stat(E).concat(modelMB("E").toFixed(1) + "MB"), sl = stat(L).concat(modelMB("L").toFixed(1) + "MB (E와 공유)");
+    $("elSum").innerHTML = ["감지된 책", "제목 확인", "· 카탈로그 확정", "· 글자로 읽은 제목", "전체 소요시간", "글자 인식 호출", "모델 용량"]
       .map((k, i) => `<tr><td>${k}</td><td class="n">${se[i]}</td><td class="n">${sl[i]}</td></tr>`).join("");
     const rows = pairBooks(E, L).map(([i, j]) => {
       const e = i === null ? null : E.books[i], l = j === null ? null : L.books[j], te = titleOf(e), tl = titleOf(l), b = e || l;
@@ -2827,7 +2871,7 @@ if (typeof module !== "undefined") module.exports = ER;
     AB.view = M;
     for (const k of ["D", "E", "L"]) { const t = $("tab" + k); t.classList.toggle("on", k === M); t.setAttribute("aria-selected", String(k === M)); }
     $("cv").hidden = false;
-    $("spec").innerHTML = M === "L" ? liberSpecHtml() : `<dt class="h">${CONFIGS[M].label} 적용 모델</dt>` + SPEC[M].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+    $("spec").innerHTML = M === "L" ? liberSpecHtml() : `<dt class="h">${CONFIGS[M].label} 적용 모델</dt>` + sizeRow(M) + SPEC[M].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
     const f = AB.filter || "all";
     redraw(); renderList(R.rows, f); $("res").hidden = false;
     $("cmp").innerHTML = "";
@@ -2835,7 +2879,7 @@ if (typeof module !== "undefined") module.exports = ER;
       const X = AB[k]; if (!X) continue;
       const d = document.createElement("div"); if (k === M) d.className = "on";
       const ok = X.rows.filter((r) => r.title).length, n = X.boxes.length, sec = (ms) => (ms / 1000).toFixed(2);
-      d.innerHTML = `<b>${CONFIGS[k].label}</b><dl class="kv2"><dt>감지된 책(권)</dt><dd>${n}</dd><dt>제목 확인된 책(권)</dt><dd>${ok}</dd><dt>1권당 검출 시간(초)</dt><dd>${n ? sec(X.tAll / n) : "-"}</dd><dt>전체 소요시간(초)</dt><dd>${sec(X.tAll)}</dd></dl>`;
+      d.innerHTML = `<b>${CONFIGS[k].label}</b><dl class="kv2"><dt>감지된 책(권)</dt><dd>${n}</dd><dt>제목 확인된 책(권)</dt><dd>${ok}</dd><dt>1권당 검출 시간(초)</dt><dd>${n ? sec(X.tAll / n) : "-"}</dd><dt>전체 소요시간(초)</dt><dd>${sec(X.tAll)}</dd><dt>모델 용량(MB)</dt><dd>${modelMB(k).toFixed(1)}</dd></dl>`;
       $("cmp").appendChild(d);
     }
     renderELCompare();
