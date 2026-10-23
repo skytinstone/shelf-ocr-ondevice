@@ -930,12 +930,12 @@ const DEVICES = [
 ].map(([group, name, chip, ram, year, reported]) => ({ group, name, chip, ram, year, reported: !!reported }));
 
 // 앱 버전: 최종 제출 전까지 0.x 유지, 패치마다 0.10 → 0.11 → 0.12 … 로 하나씩 올림
-const APP_VERSION = "0.13", APP_UPDATED = "2026-10-23 00:56 (KST)";
+const APP_VERSION = "0.14", APP_UPDATED = "2026-10-23 10:09 (KST)";
 
 // 최종모델(E) 용량 · 메모리 (MB). 검출기는 직접 학습한 YOLO11n-OBB (책등·표지 2클래스, 40에포크)
 const MODEL_INFO = {
-  trainedPt: 5.66,        // models/books_obb_best.pt
-  unified: 10.96,         // web/e_unified.onnx (FP32, 입력 960)
+  trainedPt: 5.66,        // Liber 본학습 det_obb_best.pt (1클래스 YOLO11n-OBB, 이전 2클래스와 거의 같은 크기)
+  unified: 10.96,         // web/e_unified.onnx (FP32, 입력 960, Colab에서 변환 · 설정은 web/e_unified.json)
   others: 26.34,          // 글자 검출 4.87 + 영어 인식 7.93 + 한국어 인식 13.50
   runtime: 13.79,         // ONNX Runtime WASM 11.25 + rten WASM 2.54
   unifiedPeak: 223,       // e_unified.onnx 960 입력 1스레드 실행 시 최대 메모리 실측
@@ -1803,7 +1803,9 @@ const ER = (() => {
       bs.sort((x, y) => y.score - x.score);
       const keep = [];   // 클래스별 회전 NMS (ultralytics 기본: agnostic=False)
       for (let i = 0; i < bs.length && keep.length < 300; i++) { let ok = true; for (const k of keep) if (k.cls === bs[i].cls && probiou(k, bs[i]) >= cfg.iou) { ok = false; break; } if (ok) keep.push(bs[i]); }
-      return keep.map((b) => ({ cx: (b.cx - m.px) / m.r - ox, cy: (b.cy - m.py) / m.r - oy, w: b.w / m.r, h: b.h / m.r, ang: b.ang, score: b.score, kind: b.cls === 1 ? "cover" : "spine" }));
+      return keep.map((b) => ({ cx: (b.cx - m.px) / m.r - ox, cy: (b.cy - m.py) / m.r - oy, w: b.w / m.r, h: b.h / m.r, ang: b.ang, score: b.score,
+        // 2클래스(책등·표지) 모델은 클래스로, 1클래스(book: Liber 검출기) 모델은 상자 모양으로 표지·책등 구분
+        kind: NC === 1 ? (Math.max(b.w, b.h) / Math.max(1e-6, Math.min(b.w, b.h)) < 2.2 ? "cover" : "spine") : b.cls === 1 ? "cover" : "spine" }));
     }
 
     // ---- 표지 후보: COCO 'book'(73)이 최고 클래스인 상자만, NMS IoU 0.7 (ultralytics 기본)
@@ -1960,7 +1962,7 @@ if (typeof module !== "undefined") module.exports = ER;
   const mb = (v) => v >= 1000 ? (v / 1024).toFixed(1) + "GB" : Math.round(v) + "MB";
   $("appVer").textContent = `v${APP_VERSION} · 마지막 업데이트 ${APP_UPDATED}`;
   $("mSpec").innerHTML = `<dt class="h">최종모델(E) 용량</dt>` +
-    `<dt>학습한 검출기</dt><dd>YOLO11n-OBB 책등·표지 · ${MODEL_INFO.trainedPt.toFixed(1)}MB (PyTorch) · ${MODEL_INFO.unified.toFixed(1)}MB (웹용 ONNX)</dd>` +
+    `<dt>학습한 검출기</dt><dd>YOLO11n-OBB 책 1클래스 (Liber 본학습: 1~3권 사진 보강) · ${MODEL_INFO.trainedPt.toFixed(1)}MB (PyTorch) · ${MODEL_INFO.unified.toFixed(1)}MB (웹용 ONNX)</dd>` +
     `<dt>글자 검출·인식</dt><dd>${MODEL_INFO.others.toFixed(1)}MB</dd>` +
     `<dt>모델 합계</dt><dd>${(MODEL_INFO.unified + MODEL_INFO.others).toFixed(1)}MB</dd>` +
     `<dt>실행 시 메모리</dt><dd>최대 약 ${MODEL_INFO.peak}MB (예상)</dd>`;
@@ -2424,7 +2426,7 @@ if (typeof module !== "undefined") module.exports = ER;
   //  ⑥ 줄마다 방향(90°·180°·세로쓰기) 선택 · ⑦ 회전 사각형 펴기 + 여백 + CLAHE · ⑨ 규칙 + 글자 5-gram 교정 + 카탈로그 매칭은 Liber 그대로
   const LIBER_ST = { ok: "β1 적용", sub: "대체 사용", todo: "β2 예정", hard: "β3 검토" };
   const LIBER_SPEC = [
-    ["① 책 검출", "YOLO11n-OBB", "sub", "최종모델(E)의 통합 검출기로 대체 · Liber 검출기는 정식 학습 후(β2)"],
+    ["① 책 검출", "YOLO11n-OBB (Liber 본학습)", "ok", "1~3권 사진 보강 · Colab 본학습 · 최종모델(E)과 같은 검출기 사용"],
     ["② 가짜 책 필터", "SAM 2.1 tiny", "hard", "휴대폰 속도·메모리 실측 후 결정 · 지금은 건너뜀"],
     ["③ 권수 확정", "ViT 4종 분류", "todo", "DeiT-Small(약 22MB) · 지금은 검출 결과를 그대로 권수로 사용"],
     ["④ 업스케일", "FSRCNN", "todo", "약 40KB · 지금은 원본 해상도에서 자름"],
