@@ -226,6 +226,7 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
             <tr><td>⑤⑥⑦ 글자 찾기·방향·정렬</td><td colspan="2" class="same">PP-OCRv5 글자 검출 · 줄마다 방향 결정 · 회전 펴기 + 대비 보정 · 둘 다 같음</td></tr>
             <tr><td>⑧ 글자 인식</td><td class="same">PP-OCRv5</td><td class="new">PP-OCRv5 <b>+ TrOCR</b><small>확정 안 된 책의 애매한 제목 줄만 한 번 더 읽고, 더 확신하는 쪽을 씀</small></td></tr>
             <tr><td>⑨ 제목 확정</td><td colspan="2" class="same">규칙 + 글자 5-gram 교정 + 카탈로그 매칭 (비신경망) · 둘 다 같음</td></tr>
+            <tr><td>⑩ 같은 제목</td><td class="same">상자마다 1권으로 셈</td><td class="new"><b>+ 같은 제목 합치기</b><small>제목이 같고 상자가 겹치거나 이어져 잘린 경우(한 권이 둘로 잡힘)만 1권으로 · 나란히 꽂힌 같은 책은 그대로</small></td></tr>
             <tr><td>모델 용량</td><td>37.3MB</td><td>60.6MB<small>+ TrOCR 121MB (필요할 때만 내려받음)</small></td></tr>
           </tbody>
         </table>
@@ -986,7 +987,7 @@ const DEVICES = [
 ].map(([group, name, chip, ram, year, reported]) => ({ group, name, chip, ram, year, reported: !!reported }));
 
 // 앱 버전: 최종 제출 전까지 0.x 유지, 패치마다 0.10 → 0.11 → 0.12 … 로 하나씩 올림
-const APP_VERSION = "0.23", APP_UPDATED = "2026-10-23 18:10 (KST)";
+const APP_VERSION = "0.25", APP_UPDATED = "2026-10-23 19:30 (KST)";
 
 // 최종모델(E) 용량 · 메모리 (MB). 검출기는 직접 학습한 YOLO11n-OBB (책등·표지 2클래스, 40에포크)
 const MODEL_INFO = {
@@ -2534,13 +2535,14 @@ if (typeof module !== "undefined") module.exports = ER;
     ["⑦ ROI 정렬", "회전 펴기 + CLAHE", "ok", "줄 사각형을 바로 펴고 여백 15% · 대비 보정 (JS)", "ok", "β1과 같음"],
     ["⑧ 글자 인식", "TrOCR 한국어·영어", "sub", "PP-OCRv5 한국어·영어 인식기 (CTC)로 대체", "ok", "PP-OCRv5로 먼저 읽고, 카탈로그로 확정되지 않은 책의 확신 낮은(0.9 미만) 제목 줄만 TrOCR(한국어 57MB·영어 64MB, INT8)로 다시 읽어 확신이 높은 쪽을 씀 · 필요할 때만 내려받음"],
     ["⑨ 제목 확정", "규칙 + 글자 5-gram + 카탈로그", "ok", "저자·판수·잘린 줄 제외 → 단어 교정·어순 → 카탈로그 확정 (모두 비신경망)", "ok", "β1과 같음"],
+    ["⑩ 같은 제목 합치기", "규칙", "todo", "제목이 같아도 상자마다 1권으로 셈", "ok", "제목이 같고 상자가 서로 겹치거나 한 책등이 길이 방향으로 이어져 잘린 경우만 1권으로 합침 · 나란히 꽂힌 같은 책 여러 권은 그대로 셈"],
   ];
   function liberSpecHtml(M = "L") {
     const v2 = M === "L2";
     return `<dt class="h">${CONFIGS[M].label} 적용 모델</dt>` + sizeRow(M) +
       `<dd class="note2"><img src="liber_arch.png" alt="Liber 모델 아키텍처" style="display:block;width:100%;max-width:560px;margin:4px auto 8px;border:1px solid var(--line);border-radius:8px;background:#fff"></dd>` +
       LIBER_SPEC.map(([b, m, s1, n1, s2, n2]) => { const st = v2 ? s2 : s1, note = v2 ? n2 : n1; return `<dt>${b}</dt><dd><span class="st ${st}">${LIBER_ST[st]}</span>${m}<br><small>${note}</small></dd>`; }).join("") +
-      `<dd class="note2">${v2 ? "β2 = β1 + ③ 권수 확정(ViT) + ④ 업스케일(FSRCNN) + ⑧ TrOCR 보조 인식. ②(SAM 2)는 휴대폰 속도·메모리 때문에 β3에서 검토합니다." : "β1 = ① 책 검출 + ⑤~⑨ 글자 쪽 단계. ③ 권수 확정·④ 업스케일은 β2에서 추가합니다."}</dd>`;
+      `<dd class="note2">${v2 ? "β2 = β1 + ③ 권수 확정(ViT) + ④ 업스케일(FSRCNN) + ⑧ TrOCR 보조 인식 + ⑩ 같은 제목 합치기. ②(SAM 2)는 휴대폰 속도·메모리 때문에 β3에서 검토합니다." : "β1 = ① 책 검출 + ⑤~⑨ 글자 쪽 단계. ③ 권수 확정·④ 업스케일은 β2에서 추가합니다."}</dd>`;
   }
 
   const LIB = {
@@ -2557,6 +2559,8 @@ if (typeof module !== "undefined") module.exports = ER;
          dropConf: 0.90 },   // 웹: not_book은 확신이 이 이상이고 제목도 안 읽힐 때만 버림 (서점 표지를 0.79로 버린 사례)
     // β2 ④ 업스케일 (노트북 Cell 4-1과 같은 값)
     SR: { target: 96, maxLong: 2400, scales: [2, 3, 4] },
+    // β2 ⑩ 같은 제목 합치기: 겹침 비율 · 길이 방향 정렬 허용(짧은 변 배수) · 끝과 끝 사이 틈(짧은 변 배수)
+    MERGE: { overlap: 0.2, across: 0.5, gap: 0.5 },
     lex: null,
   };
   const LIB_AUTHOR = /(지음|지은이|옮김|공역|편역|편저|감수|역|저|著)\s*$|^[가-힣]{2,4}\s*[·•+∙,]\s*[가-힣]{2,4}|[《〈(\[]\s*(공?역|공?저|편|감수|옮김)\s*[》〉)\]]|^.{0,3}수\s*:|^([가-힣]{3}\s+){2,}[가-힣]{3}$/;   // 마지막: 줄 전체가 세 글자 이름 3개 이상 (구분 기호가 빠진 저자 목록)
@@ -2987,14 +2991,39 @@ if (typeof module !== "undefined") module.exports = ER;
       books.push({ ...bk, ...r });
     }
     if (v2) { if (TR.off) skipped.push("⑧ TrOCR"); await releaseL2(); }   // FSRCNN·TrOCR 반납 → 다음 사진·β1 실행에 메모리를 돌려줌
-    const R = { books, tDet, tAll: performance.now() - t0, calls: books.reduce((s, b) => s + b.calls, 0), nDet, chunk, nSr, skipped };
+    // β2 ⑩ 같은 제목 합치기: 제목(띄어쓰기·기호 무시)이 같고 상자가 '한 권이 둘로 잡힌 모양'일 때만 1권으로 합침
+    //  같은 모양 = 서로 겹침(작은 상자의 overlap 이상) 또는 한 책등이 길이 방향으로 이어져 잘림(옆으로 나란히 꽂힌 같은 책 여러 권은 그대로 셈)
+    //  제거 실험: 같은 제목을 모두 합치면 같은 책이 여러 권 꽂힌 책장에서 권수 정확도 87.9% → 78.7%로 떨어져 쓰지 않음
+    let nMerged = 0;
+    const M = LIB.MERGE;
+    const axis = (b) => { const a = b.w >= b.h ? b.ang : b.ang + Math.PI / 2; return [Math.cos(a), Math.sin(a), Math.max(b.w, b.h), Math.min(b.w, b.h)]; };
+    const sameBook = (a, b) => {
+      const ov = EP.polyInter(a.poly, b.poly) / Math.max(1e-6, Math.min(EP.polyArea(a.poly), EP.polyArea(b.poly)));
+      if (ov >= M.overlap) return true;
+      const [ux, uy, la, sa] = axis(a), [, , lb, sb] = axis(b), dx = b.cx - a.cx, dy = b.cy - a.cy;
+      const along = Math.abs(dx * ux + dy * uy), across = Math.abs(-dx * uy + dy * ux), short = Math.min(sa, sb);
+      return across <= M.across * short && along - (la + lb) / 2 <= M.gap * short;   // 같은 줄 위에서 끝과 끝이 맞닿음
+    };
+    if (v2 && !/nomerge/.test(off)) {
+      for (let i = 0; i < books.length; i++) {
+        const b = books[i], key = b.final && b.final !== "Unknown" ? SP.normalize(b.final) : "";
+        if (!key || b.spiral) continue;
+        const host = books.slice(0, i).find((h) => h.final && SP.normalize(h.final) === key && sameBook(h, b));
+        if (!host) continue;
+        host.merged = (host.merged || 1) + 1; nMerged++;
+        if (b.source === "카탈로그" && host.source !== "카탈로그") Object.assign(host, { final: b.final, source: b.source, score: b.score });
+        books.splice(i--, 1);
+      }
+      for (const b of books) if (b.merged > 1) b.view += ` · 한 권이 상자 ${b.merged}개로 잡혀 합침`;
+    }
+    const R = { books, tDet, nMerged, tAll: performance.now() - t0, calls: books.reduce((s, b) => s + b.calls, 0), nDet, chunk, nSr, skipped };
     window.__LIB_LAST = books.map((b, i) => ({ no: i + 1, final: b.final, raw: b.raw, corrected: b.corrected, dbg: b.dbg, vit: b.vit }));
     (window.__LIB_RUNS = window.__LIB_RUNS || {})[v2 ? "L2" : "L"] = books.map((b) => ({ x: b.cx / img.width, y: b.cy / img.height, title: b.final !== "Unknown" ? b.final : null }));   // 개발용: 평가 스크립트가 사진 일부 영역(ROI)만 셀 때 사용
     if (chunk) window.__LIB2_CHUNK = { verdicts: chunk.verdicts, dropped: chunk.dropped.map((d) => `${d.idx + 1}:${d.cls} ${d.prob.toFixed(2)} → ${d.why}`), nSplit: chunk.nSplit, nSr };
     setProgress(p1, `${tag}: 완료`);
     logLine(`${tag} 결과: ${books.length}권` + (chunk ? ` (검출 ${nDet} → ③ 버림 ${chunk.dropped.length} · 나눔 ${chunk.nSplit} · ④ 업스케일 ${nSr}권)` : "") +
-      (off ? ` · 실험 옵션 ${off}` : "") + (skipped.length ? ` · 메모리 부족으로 건너뜀: ${skipped.join(", ")}` : "") + ` · 검출 ${(R.tDet / 1000).toFixed(1)}초 · 전체 ${(R.tAll / 1000).toFixed(1)}초 · 인식 호출 ${R.calls}회`);
-    const rows = books.map((b) => ({ title: b.final !== "Unknown" ? b.final : null, src: b.source, kind: b.kind, noText: b.noText, spiral: b.source === "스프링 노트", raw: b.raw || "", view: b.view }));
+      (nMerged ? ` · ⑩ 한 권이 둘로 잡힌 상자 ${nMerged}개 합침` : "") + (off ? ` · 실험 옵션 ${off}` : "") + (skipped.length ? ` · 메모리 부족으로 건너뜀: ${skipped.join(", ")}` : "") + ` · 검출 ${(R.tDet / 1000).toFixed(1)}초 · 전체 ${(R.tAll / 1000).toFixed(1)}초 · 인식 호출 ${R.calls}회`);
+    const rows = books.map((b) => ({ title: b.final !== "Unknown" ? b.final : null, src: b.source, kind: b.kind, noText: b.noText, spiral: b.source === "스프링 노트", raw: b.raw || "", view: b.view, merged: b.merged || 1 }));
     return { ...R, boxes: books, rows };
   }
   const AB = { A: null, B: null, D: null, E: null, L: null, L2: null, img: null, view: "L", eView: 3 };
@@ -3096,7 +3125,7 @@ if (typeof module !== "undefined") module.exports = ER;
       const nCat = R.books.filter((b) => b.source === "카탈로그").length, nOcr = R.books.filter((b) => b.source === "OCR").length;
       $("cvCap").textContent = `${CONFIGS[M].label} 결과: 제목 인식 ${nCat + nOcr} / ${R.books.length}권 (카탈로그 확정 ${nCat} · 글자로 읽은 제목 ${nOcr}) · 전체 ${(R.tAll / 1000).toFixed(1)}초` +
         (R.chunk ? ` · ③ 검출 ${R.nDet} → 버림 ${R.chunk.dropped.length} · 나눔 ${R.chunk.nSplit} · ④ 업스케일 ${R.nSr}권` : "") +
-        (R.skipped && R.skipped.length ? ` · ⚠ 메모리 부족으로 건너뜀: ${R.skipped.join(", ")}` : "");
+        (R.nMerged ? ` · ⑩ 둘로 잡힌 책 ${R.nMerged}권 합침` : "") + (R.skipped && R.skipped.length ? ` · ⚠ 메모리 부족으로 건너뜀: ${R.skipped.join(", ")}` : "");
     } else { $("cvCap").hidden = true; $("cvLeg").hidden = true; drawImage(AB.img, R.boxes, R.rows.map((r) => !!r.title), show); }
   }
   for (const [id, v] of [["ev1", 1], ["ev2", 2], ["ev3", 3]]) $(id).addEventListener("click", () => {
@@ -3137,7 +3166,7 @@ if (typeof module !== "undefined") module.exports = ER;
       const li = document.createElement("li"), no = document.createElement("span"), t = document.createElement("span");
       no.className = "no"; no.textContent = (i + 1) + "."; t.className = "t " + (r.title ? (r.src === "OCR" ? "ocr" : "ok") : "unk");
       t.textContent = r.title || (r.spiral ? "제목 미인식 (스프링 노트)" : r.noText ? "제목 미인식 (글자 없는 책등)" : "제목 미인식");
-      if (r.kind) { const k = document.createElement("span"); k.className = "kind"; k.textContent = (r.kind === "cover" ? "표지" : "책등") + (r.src === "OCR" ? " · 글자로 읽음" : r.src === "카탈로그" ? " · 카탈로그" : ""); t.appendChild(k); }
+      if (r.kind) { const k = document.createElement("span"); k.className = "kind"; k.textContent = (r.kind === "cover" ? "표지" : "책등") + (r.src === "OCR" ? " · 글자로 읽음" : r.src === "카탈로그" ? " · 카탈로그" : "") + (r.merged > 1 ? ` · 상자 ${r.merged}개를 1권으로 합침` : ""); t.appendChild(k); }
       li.append(no, t); ol.appendChild(li);
     });
     const ok = rows.filter((r) => r.title).length;
