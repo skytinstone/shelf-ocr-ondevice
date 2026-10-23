@@ -11,8 +11,7 @@ function isMobileOrTablet() {
 }
 if (!isMobileOrTablet()) { if (window.stop) window.stop(); location.replace("./"); }
 </script>
-<title>On-Device 책 권수·제목 추출 시스템 (밀리의 서재 사전과제 · 신민석)</title>
-<meta name="claude:viewport-fit-sides" content="cover">
+<title>Liber Deprehensus · On-Device 책 권수·제목 추출</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;600;700&display=swap">
 <style>
 /* Layout: 단일 열 계측기 화면. 상단 기기 정보 → 실행 → 결과표 → 실사진 검출 */
@@ -173,8 +172,8 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
 
 <div class="wrap">
   <header>
-    <h1><small class="brand">사전과제 데모 · 비공식</small><span>On-Device 책 권수/제목 추출 시스템</span></h1>
-    <p class="who">AI 엔지니어 사전과제 · 지원자 신민석</p>
+    <h1><small class="brand">Liber Deprehensus · 데모</small><span>On-Device 책 권수/제목 추출 시스템</span></h1>
+    <p class="who">LLM·멀티모달 대화형 모델 없이 휴대폰 안에서 실행되는 비전 모델</p>
     <p class="ver" id="appVer"></p>
     <p class="brnote" id="brNote">이 데모는 <b>Chrome 브라우저</b>에 최적화되어 있습니다. Chrome으로 접속해 주세요.</p>
     <p class="lede">On-Device 환경에서 책장 이미지를 업로드하여, 책장에 꽂혀 있는 책들의 권 수와 책 제목들을 인식할 수 있는 시스템을 구성하였습니다.<br>※ 사진은 서버로 전송하거나 저장되지 않습니다.</p>
@@ -235,13 +234,14 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
           <thead><tr><th>지표</th><th class="n">β1</th><th class="n">β2</th><th class="n">변화</th></tr></thead>
           <tbody>
             <tr><td>제목 재현율<small>정답 제목 중 맞힌 비율</small></td><td class="n">48.7%</td><td class="n">56.6%</td><td class="n up">+7.9%p<small>상대 +16.2%</small></td></tr>
-            <tr><td>제목 정밀도<small>읽어 낸 제목 중 맞은 비율</small></td><td class="n">49.1%</td><td class="n">54.7%</td><td class="n up">+5.6%p<small>상대 +11.4%</small></td></tr>
-            <tr><td>제목 F1<small>재현율·정밀도의 조화평균</small></td><td class="n">48.9%</td><td class="n">55.7%</td><td class="n up">+6.8%p<small>상대 +13.9%</small></td></tr>
-            <tr><td>권수 정확도<small>1 − |권수 오차| ÷ 정답 권수</small></td><td class="n">87.9%</td><td class="n">87.9%</td><td class="n eq">같음</td></tr>
-            <tr><td>평균 처리 시간<small>사진 1장</small></td><td class="n">31.6초</td><td class="n">41.8초</td><td class="n dn">+10.2초</td></tr>
+            <tr><td>제목 정밀도<small>읽어 낸 제목 중 맞은 비율</small></td><td class="n">49.1%</td><td class="n">55.2%</td><td class="n up">+6.1%p<small>상대 +12.4%</small></td></tr>
+            <tr><td>제목 F1<small>재현율·정밀도의 조화평균</small></td><td class="n">48.9%</td><td class="n">55.9%</td><td class="n up">+7.0%p<small>상대 +14.3%</small></td></tr>
+            <tr><td>권수 정확도<small>1 − |권수 오차| ÷ 정답 권수</small></td><td class="n">87.9%</td><td class="n">87.5%</td><td class="n eq">−0.4%p</td></tr>
+            <tr><td>평균 처리 시간<small>사진 1장 · PC</small></td><td class="n">30.7초</td><td class="n">41.0초</td><td class="n dn">+10.3초</td></tr>
+            <tr><td>실기기 처리 시간<small>iPhone 15 Pro · 같은 사진</small></td><td class="n">47.8초</td><td class="n">72.8초</td><td class="n dn">+25.0초</td></tr>
           </tbody>
         </table>
-        <p class="foot">측정 방법: 사진마다 정답 권수·제목을 미리 적어 둔 시험 세트로 두 모델을 같은 조건에서 실행. 제목은 정답과 글자 유사도 80% 이상이면 맞음. 시간은 PC Chrome(아이폰 화면 크기)에서 잰 값으로, 실제 휴대폰에서는 더 걸립니다.</p>
+        <p class="foot">측정 방법: 사진마다 정답 권수·제목을 미리 적어 둔 시험 세트로 두 모델을 같은 조건에서 실행. 제목은 정답과 글자 유사도 80% 이상이면 맞음. 평균 시간은 PC Chrome(아이폰 화면 크기)에서, 실기기 시간은 iPhone 15 Pro Chrome에서 같은 사진(사전 책장 25권)으로 잰 값입니다.</p>
         <p class="foot">LLM·멀티모달 대화형 모델은 쓰지 않습니다. 모든 모델은 이미지만 입력받는 단일 목적 비전 모델이며 휴대폰 안에서 실행됩니다.</p>
       </div>
       <dl class="spec" id="spec"></dl>
@@ -987,7 +987,7 @@ const DEVICES = [
 ].map(([group, name, chip, ram, year, reported]) => ({ group, name, chip, ram, year, reported: !!reported }));
 
 // 앱 버전: 최종 제출 전까지 0.x 유지, 패치마다 0.10 → 0.11 → 0.12 … 로 하나씩 올림
-const APP_VERSION = "0.25", APP_UPDATED = "2026-10-23 19:30 (KST)";
+const APP_VERSION = "0.26", APP_UPDATED = "2026-10-24 00:30 (KST)";
 
 // 최종모델(E) 용량 · 메모리 (MB). 검출기는 직접 학습한 YOLO11n-OBB (책등·표지 2클래스, 40에포크)
 const MODEL_INFO = {
@@ -2387,21 +2387,16 @@ if (typeof module !== "undefined") module.exports = ER;
   }
 
   function summary() {
-    const dr = deviceRecord(); const lines = ["[밀리의서재 사전과제 온디바이스 벤치] " + new Date().toISOString(), `지원자 신민석 · 기기: ${dr.picked || dr.type} / ${dr.os} / 모델 ${dr.model} / 화면 ${dr.foldState}`, "UA: " + navigator.userAgent, "cores: " + navigator.hardwareConcurrency];
+    const dr = deviceRecord(); const lines = ["[On-Device 벤치] " + new Date().toISOString(), `기기: ${dr.picked || dr.type} / ${dr.os} / 모델 ${dr.model} / 화면 ${dr.foldState}`, "UA: " + navigator.userAgent, "cores: " + navigator.hardwareConcurrency];
     for (const m of MODELS) { const r = results[m.key]; if (r) lines.push(`${m.label}: load ${fmt(r.load)}, median ${fmt(r.med)}, p95 ${fmt(r.p95)} ${r.note || ""}`); }
     if (results.estFull) lines.push(`사진 1장 실측: A 초기 ${fmt(results.estFull)}, B 개선 ${fmt(results.estEarly)}`);
     return lines.join("\n");
   }
 
-  async function save() {
-    try {
-      const db = await claude.use("db");
-      if (!db) { $("saved").textContent = "결과 자동 저장을 쓸 수 없는 환경입니다. 결과 복사로 전달해 주세요."; return; }
-      const data = { at: new Date().toISOString(), device: deviceRecord(), ua: navigator.userAgent, cores: navigator.hardwareConcurrency || 0, booksAssumed: BOOKS, callsEarly: CALLS_EARLY, results: JSON.parse(JSON.stringify(results)) };
-      await db.collection("runs").add(data);
-      $("saved").innerHTML = '<span class="ok">결과를 저장했습니다.</span> 대화로 돌아가 측정이 끝났다고 알려주세요.';
-    } catch (e) { $("saved").textContent = "저장 실패(" + (e.code || e.message) + "). 결과 복사로 전달해 주세요."; }
+  async function save() {   // 자동 저장 없음: 결과는 '결과 복사'로 전달
+    $("saved").textContent = "결과 복사 버튼으로 측정 결과를 복사할 수 있습니다.";
   }
+
 
   $("run").addEventListener("click", async () => {
     if (!$("dPick").value) { $("st").innerHTML = '<span class="bad">먼저 위의 기기 선택에서 기기를 골라 주세요.</span>'; $("dPick").focus(); $("dPick").scrollIntoView({ block: "center" }); return; }
@@ -2527,7 +2522,7 @@ if (typeof module !== "undefined") module.exports = ER;
   // [블록, 설계 모델, β1 상태, β1 설명, β2 상태, β2 설명]
   const LIBER_SPEC = [
     ["① 책 검출", "YOLO11n-OBB (Liber 본학습)", "ok", "1~3권 사진 보강 · Colab 본학습 · 960 입력 · 신뢰도 0.45", "ok", "β1과 같음"],
-    ["② 가짜 책 필터", "SAM 2.1 tiny", "hard", "휴대폰 속도·메모리 실측 후 결정 · 지금은 건너뜀", "hard", "β3: 애매한 상자가 있을 때만 부르는 방식으로 검토"],
+    ["② 가짜 책 필터", "SAM 2.1 tiny", "hard", "PC 버전에서 검증 · Edge 탑재 제약(메모리·처리 시간)으로 On-Device에서는 제외", "hard", "애매한 상자에만 부르는 조건부 호출 방식 시험 중"],
     ["③ 권수 확정", "ViT 4종 분류", "todo", "검출 결과를 그대로 권수로 사용", "ok", "DeiT-Small INT8 23.2MB · partial 합침 / multiple 낱권 두께로 나눔 · not_book은 확신 0.9 이상 + 제목이 안 읽힐 때만 버림 · 중복 정리"],
     ["④ 업스케일", "FSRCNN", "todo", "원본 해상도에서 그대로 자름", "ok", "FSRCNN x2~x4 (각 35KB) · 책 폭이 96px보다 좁을 때만 · 밝기(Y)만 키우고 색은 보간"],
     ["⑤ 글자 검출", "PP-OCRv5 det", "ok", "PP-OCRv5 mobile det (DBNet) 4.9MB", "ok", "β1과 같음"],
@@ -2542,7 +2537,7 @@ if (typeof module !== "undefined") module.exports = ER;
     return `<dt class="h">${CONFIGS[M].label} 적용 모델</dt>` + sizeRow(M) +
       `<dd class="note2"><img src="liber_arch.png" alt="Liber 모델 아키텍처" style="display:block;width:100%;max-width:560px;margin:4px auto 8px;border:1px solid var(--line);border-radius:8px;background:#fff"></dd>` +
       LIBER_SPEC.map(([b, m, s1, n1, s2, n2]) => { const st = v2 ? s2 : s1, note = v2 ? n2 : n1; return `<dt>${b}</dt><dd><span class="st ${st}">${LIBER_ST[st]}</span>${m}<br><small>${note}</small></dd>`; }).join("") +
-      `<dd class="note2">${v2 ? "β2 = β1 + ③ 권수 확정(ViT) + ④ 업스케일(FSRCNN) + ⑧ TrOCR 보조 인식 + ⑩ 같은 제목 합치기. ②(SAM 2)는 휴대폰 속도·메모리 때문에 β3에서 검토합니다." : "β1 = ① 책 검출 + ⑤~⑨ 글자 쪽 단계. ③ 권수 확정·④ 업스케일은 β2에서 추가합니다."}</dd>`;
+      `<dd class="note2">${v2 ? "β2 = β1 + ③ 권수 확정(ViT) + ④ 업스케일(FSRCNN) + ⑧ TrOCR 보조 인식 + ⑩ 같은 제목 합치기. ②(SAM 2)는 Edge 탑재 제약으로 제외했으며, 조건부 호출 방식을 시험하고 있습니다." : "β1 = ① 책 검출 + ⑤~⑨ 글자 쪽 단계. ③ 권수 확정·④ 업스케일은 β2에서 추가합니다."}</dd>`;
   }
 
   const LIB = {
@@ -3272,15 +3267,8 @@ if (typeof module !== "undefined") module.exports = ER;
     renderModel(M);
   }
   for (const M of ["L", "L2"]) $("tab" + M).addEventListener("click", () => openModel(M));
-  async function saveRun(M) {
-    try {
-      const db = await claude.use("db"); if (!db) return; const X = AB[M];
-      const books = M === "E" ? X.books.map((b, i) => ({ no: i + 1, kind: b.kind, final: b.final, source: b.source, raw: (b.raw || "").slice(0, 80), view: b.view }))
-        : X.rows.map((r, i) => ({ no: i + 1, title: r.title || "", noText: !!r.noText, raw: (r.raw || "").slice(0, 80), score: r.score }));
-      await db.collection("detections").add({ at: new Date().toISOString(), model: M, device: deviceRecord(), image: { w: AB.img.width, h: AB.img.height }, count: X.boxes.length,
-        confirmed: X.rows.filter((r) => r.title).length, msDetect: Math.round(X.tDet), msTotal: Math.round(X.tAll), ocrCalls: X.calls, books });
-    } catch (_) {}
-  }
+  async function saveRun() {}   // 실행 기록은 기기 밖으로 보내지 않음
+
 
   // 한 구성으로 사진 처리. p0~p1: 진행 팝업에서 이 구성이 차지하는 구간
   async function processModel(img, M, p0, p1) {

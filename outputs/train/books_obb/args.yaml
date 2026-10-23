@@ -1,8 +1,8 @@
 task: obb
 mode: train
-model: /Users/minseok/Downloads/shelf_ocr_test/models/yolo11n-obb.pt
+model: books_obb_r1.pt
 data: /Users/minseok/Downloads/shelf_ocr_test/datasets/books_obb/data.yaml
-epochs: 40
+epochs: 25
 time: null
 patience: 12
 batch: 8
@@ -102,7 +102,7 @@ perspective: 0.0
 flipud: 0.5
 fliplr: 0.5
 bgr: 0.0
-mosaic: 0.7
+mosaic: 0.3
 mixup: 0.0
 cutmix: 0.0
 copy_paste: 0.0

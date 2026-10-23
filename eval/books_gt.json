@@ -1,24 +1,115 @@
 {
- "_설명": "단권·3권 책 사진 정답지. truth = 사용자가 알려 준 실제 책, claude = Claude가 사진을 보고 읽은 비교용 판독(코드에는 쓰지 않음). count_ok = 권수로 인정하는 값(사진 가장자리에 다른 책이 일부 잘려 보이는 경우 포함). aliases = 정답으로 인정하는 제목 표기",
+ "_설명": "단권·3권 책 사진 정답지. truth = 실제 책(사용자 확인), count_ok = 권수로 인정하는 값(사진 가장자리에 다른 책이 일부 잘려 보이는 경우 포함), aliases = 정답으로 인정하는 제목 표기",
  "_books": {
-  "embedded": {"truth": "Embedded Recipes", "aliases": ["Embedded Recipes"]},
-  "circuit": {"truth": "Engineering Circuit Analysis 회로이론", "aliases": ["Engineering Circuit Analysis 회로이론", "회로이론 Engineering Circuit Analysis", "회로이론", "Engineering Circuit Analysis"]},
-  "kreyszig": {"truth": "Kreyszig 공업수학", "aliases": ["KREYSZIG 공업수학 하", "공업수학 하", "KREYSZIG 공업수학", "공업수학"]}
+  "embedded": {
+   "truth": "Embedded Recipes",
+   "aliases": [
+    "Embedded Recipes"
+   ]
+  },
+  "circuit": {
+   "truth": "Engineering Circuit Analysis 회로이론",
+   "aliases": [
+    "Engineering Circuit Analysis 회로이론",
+    "회로이론 Engineering Circuit Analysis",
+    "회로이론",
+    "Engineering Circuit Analysis"
+   ]
+  },
+  "kreyszig": {
+   "truth": "Kreyszig 공업수학",
+   "aliases": [
+    "KREYSZIG 공업수학 하",
+    "공업수학 하",
+    "KREYSZIG 공업수학",
+    "공업수학"
+   ]
+  }
  },
- "IMG_1587.jpg": {"label": "단권 · Embedded Recipes 표지", "count": 1, "count_ok": [1], "books": ["embedded"],
-   "claude": {"count": 1, "titles": ["EMBEDDED RECIPES"]}},
- "IMG_1588.jpg": {"label": "단권 · Embedded Recipes 책등(가로)", "count": 1, "count_ok": [1, 2], "books": ["embedded"],
-   "claude": {"count": 1, "titles": ["Embedded Recipes"], "note": "아래 가장자리에 다른 책 일부가 잘려 보임"}},
- "IMG_1589.jpg": {"label": "단권 · 회로이론 표지(90° 회전)", "count": 1, "count_ok": [1], "books": ["circuit"],
-   "claude": {"count": 1, "titles": ["Engineering Circuit Analysis 회로이론 (11판)"]}},
- "IMG_1590.jpg": {"label": "단권 · 회로이론 책등(손에 듦)", "count": 1, "count_ok": [1, 2], "books": ["circuit"],
-   "claude": {"count": 1, "titles": ["회로이론 Engineering Circuit Analysis (11판)"], "note": "아래에 Kreyszig 표지 일부가 잘려 보임"}},
- "IMG_1591.jpg": {"label": "단권 · Kreyszig 공업수학 표지", "count": 1, "count_ok": [1], "books": ["kreyszig"],
-   "claude": {"count": 1, "titles": ["KREYSZIG 공업수학 하 (10판)"]}},
- "IMG_1592.jpg": {"label": "단권 · Kreyszig 공업수학 책등(가로)", "count": 1, "count_ok": [1], "books": ["kreyszig"],
-   "claude": {"count": 1, "titles": ["KREYSZIG 공업수학 하 (10판)"]}},
- "IMG_1593.jpg": {"label": "3권 · 2권 눕힘 + 1권 세움", "count": 3, "count_ok": [3], "books": ["circuit", "kreyszig", "embedded"],
-   "claude": {"count": 3, "titles": ["회로이론 Engineering Circuit Analysis", "KREYSZIG 공업수학 하", "Embedded Recipes"]}},
- "IMG_1594.jpg": {"label": "3권 · 가로로 쌓음", "count": 3, "count_ok": [3], "books": ["embedded", "circuit", "kreyszig"],
-   "claude": {"count": 3, "titles": ["Embedded Recipes", "회로이론 Engineering Circuit Analysis", "KREYSZIG 공업수학 하"]}}
+ "IMG_1587.jpg": {
+  "label": "단권 · Embedded Recipes 표지",
+  "count": 1,
+  "count_ok": [
+   1
+  ],
+  "books": [
+   "embedded"
+  ]
+ },
+ "IMG_1588.jpg": {
+  "label": "단권 · Embedded Recipes 책등(가로)",
+  "count": 1,
+  "count_ok": [
+   1,
+   2
+  ],
+  "books": [
+   "embedded"
+  ]
+ },
+ "IMG_1589.jpg": {
+  "label": "단권 · 회로이론 표지(90° 회전)",
+  "count": 1,
+  "count_ok": [
+   1
+  ],
+  "books": [
+   "circuit"
+  ]
+ },
+ "IMG_1590.jpg": {
+  "label": "단권 · 회로이론 책등(손에 듦)",
+  "count": 1,
+  "count_ok": [
+   1,
+   2
+  ],
+  "books": [
+   "circuit"
+  ]
+ },
+ "IMG_1591.jpg": {
+  "label": "단권 · Kreyszig 공업수학 표지",
+  "count": 1,
+  "count_ok": [
+   1
+  ],
+  "books": [
+   "kreyszig"
+  ]
+ },
+ "IMG_1592.jpg": {
+  "label": "단권 · Kreyszig 공업수학 책등(가로)",
+  "count": 1,
+  "count_ok": [
+   1
+  ],
+  "books": [
+   "kreyszig"
+  ]
+ },
+ "IMG_1593.jpg": {
+  "label": "3권 · 2권 눕힘 + 1권 세움",
+  "count": 3,
+  "count_ok": [
+   3
+  ],
+  "books": [
+   "circuit",
+   "kreyszig",
+   "embedded"
+  ]
+ },
+ "IMG_1594.jpg": {
+  "label": "3권 · 가로로 쌓음",
+  "count": 3,
+  "count_ok": [
+   3
+  ],
+  "books": [
+   "embedded",
+   "circuit",
+   "kreyszig"
+  ]
+ }
 }

@@ -1,4 +1,4 @@
-"""PC 평가: 노트북과 같은 E 파이프라인으로 eval/images 9장을 돌려 Claude 판독 정답과 비교
+"""PC 평가: 노트북과 같은 E 파이프라인으로 eval/images 9장을 돌려 정답지(eval/gt.json)와 비교
 
 사용법 (shelf_ocr_test 폴더에서):
   python eval/run_pc_eval.py            # DB 있는 조건 (eval/catalog_db.json, 230권)
