@@ -77,6 +77,12 @@ canvas { width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--
 .spec .st { display: inline-block; font-size: .7rem; font-weight: 700; border-radius: 4px; padding: 0 5px; margin-right: 6px; }
 .spec .st.ok { background: #e3f4ea; color: #1f7a4d; } .spec .st.todo { background: #fff4dc; color: #9a6700; } .spec .st.hard { background: #fde8e8; color: #b42318; } .spec .st.sub { background: #e8eefc; color: #1f4fb4; }
 .spec .note2 { grid-column: 1 / -1; margin-top: 6px; color: var(--sub); line-height: 1.5; }
+.elcmp { margin: 14px 0 4px; }
+.elcmp h3 { font-size: .95rem; margin: 0 0 6px; color: var(--acc); }
+.elcmp td { white-space: normal; vertical-align: top; }
+.elcmp td small { display: block; color: var(--sub); font-size: .72rem; }
+.elcmp td.same { color: var(--ok); font-weight: 600; } .elcmp td.diff { color: var(--warn); font-weight: 600; } .elcmp td.none { color: var(--sub); }
+.elcmp .tbl + .tbl { margin-top: 8px; }
 .eviews .tab { font-size: .8rem; }
 .cvcap { font-size: .8rem; color: var(--sub); margin: 6px 0 0; }
 .blist .kind { font-size: .72rem; color: var(--sub); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; margin-left: 6px; font-weight: 500; white-space: nowrap; }
@@ -187,15 +193,20 @@ select { font: inherit; color: var(--ink); background: var(--panel); border: 1px
     </div>
     <p class="status" id="dst">사진을 넣으면 최종모델(E)로 인식합니다. 다른 모델 탭을 누르면 같은 사진을 그 모델로 인식해 비교합니다.</p>
     <div id="abWrap" hidden>
-      <div class="tabs tabs4" role="tablist">
-        <button type="button" role="tab" id="tabA" class="tab" aria-selected="false">초기모델(A)</button>
-        <button type="button" role="tab" id="tabB" class="tab" aria-selected="false">개선모델(B)</button>
+      <div class="tabs tabs3" role="tablist">
         <button type="button" role="tab" id="tabD" class="tab" aria-selected="false">PaddleOCR(D)</button>
         <button type="button" role="tab" id="tabE" class="tab on" aria-selected="true">최종모델(E)</button>
-        <button type="button" role="tab" id="tabL" class="tab beta" aria-selected="false">Liber(β1) · Liber-lite</button>
+        <button type="button" role="tab" id="tabL" class="tab" aria-selected="false">Liber(β1)</button>
       </div>
       <dl class="spec" id="spec"></dl>
       <div class="cmp" id="cmp"></div>
+      <div class="elcmp" id="elCmp" hidden>
+        <h3>최종모델(E) · Liber(β1) 인식 비교</h3>
+        <p class="note" id="elNote"></p>
+        <div class="tbl" id="elSumWrap"><table><thead><tr><th>항목</th><th class="n">최종모델(E)</th><th class="n">Liber(β1)</th></tr></thead><tbody id="elSum"></tbody></table></div>
+        <div class="tbl" id="elTblWrap"><table><thead><tr><th>번호</th><th>종류</th><th>최종모델(E)</th><th>Liber(β1)</th><th>비교</th></tr></thead><tbody id="elBody"></tbody></table></div>
+        <div class="row"><button type="button" class="ghost" id="elRun" hidden></button><button type="button" class="ghost" id="elCopy" hidden>비교표 복사</button></div>
+      </div>
     </div>
     <div class="tabs tabs3 eviews" id="eViews" role="tablist" aria-label="최종모델 단계 보기" hidden>
       <button type="button" role="tab" class="tab" id="ev1" aria-selected="false">Step 1 · 책 검출</button>
@@ -930,7 +941,7 @@ const DEVICES = [
 ].map(([group, name, chip, ram, year, reported]) => ({ group, name, chip, ram, year, reported: !!reported }));
 
 // 앱 버전: 최종 제출 전까지 0.x 유지, 패치마다 0.10 → 0.11 → 0.12 … 로 하나씩 올림
-const APP_VERSION = "0.14", APP_UPDATED = "2026-10-23 10:09 (KST)";
+const APP_VERSION = "0.15", APP_UPDATED = "2026-10-23 10:27 (KST)";
 
 // 최종모델(E) 용량 · 메모리 (MB). 검출기는 직접 학습한 YOLO11n-OBB (책등·표지 2클래스, 40에포크)
 const MODEL_INFO = {
@@ -2411,22 +2422,21 @@ if (typeof module !== "undefined") module.exports = ER;
   const SPEC = {
     A: [["책등 검출", "YOLO11n-OBB · 1280 입력 고정 · INT8 3.5MB"], ["글자 인식", "EasyOCR 한국어 (korean_g2, CRNN+CTC) · INT8 10.4MB"], ["제목 확정", "매칭 점수 72 이상이면 바로 확정 · 3방향 모두 판독"], ["실행 엔진", "ONNX Runtime Web (WASM)"]],
     B: [["책등 검출", "YOLO11n-OBB · 640 INT8 3.2MB, 원거리면 1280 재검출"], ["글자 인식", "EasyOCR 한국어 (korean_g2, CRNN+CTC) · INT8 10.4MB"], ["제목 확정", "조기 종료 · 권차·점수 차·포함 관계 검증 · 글자 없는 책등 판별"], ["실행 엔진", "ONNX Runtime Web (WASM)"]],
-    D: [["책등 검출", "YOLO11n-OBB · 640 INT8 3.2MB, 원거리면 1280 재검출 (B와 같음)"], ["글자 인식", "PaddleOCR PP-OCRv5 한국어 mobile (SVTR-LCNet+CTC) · FP32 13.5MB"], ["제목 확정", "B와 같은 검증 규칙"], ["실행 엔진", "검출 ONNX Runtime Web · 인식 rten (WASM)"]],
-    E: [["책등 검출", "YOLO11n-OBB 960 입력 (conf 0.45 · iou 0.5) · 가중치 INT8 3.2MB"],
-        ["표지 검출", "YOLO11x COCO 'book' 클래스 960 입력 1회 · 가중치 INT8 58MB"],
-        ["검출 정리", "표지 3단계 후보 · 포함 관계 · 띠지 병합 · 넓은 상자 분리 · 가로/세로 글줄 판정 · 스프링 노트(FFT) · 바닥 정렬"],
+    D: [["책등 검출", "YOLO11n-OBB · 640 INT8 3.2MB, 원거리면 1280 재검출"], ["글자 인식", "PaddleOCR PP-OCRv5 한국어 mobile (SVTR-LCNet+CTC) · FP32 13.5MB"], ["제목 확정", "조기 종료 · 권차·점수 차·포함 관계 검증 · 글자 없는 책등 판별"], ["실행 엔진", "검출 ONNX Runtime Web · 인식 rten (WASM)"]],
+    E: [["책 검출", "통합 검출기 YOLO11n-OBB (Liber 본학습 · 1~3권 사진 보강) · 960 입력 · 신뢰도 0.45 · FP32 11.0MB"],
+        ["검출 정리", "중복 상자 정리 · 사진 가장자리 띠 제거 · 상자 모양으로 표지·책등 구분 · 스프링 노트(FFT) · 읽는 순서"],
         ["글자 검출", "PaddleOCR PP-OCRv5 mobile det (DBNet) 4.9MB"],
         ["글자 인식", "PP-OCRv5 한국어 mobile 13.5MB + 영어 mobile 7.9MB · 책 단위 4방향 판단 · 큰 글씨만 제목"],
         ["제목 확정", "카탈로그 확정 > 글자로 읽은 제목 > Unknown · 권차·점수 차·포함 관계 검증 · 저자·출판사·시리즈명은 제목으로 쓰지 않음"],
         ["실행 엔진", "ONNX Runtime Web(검출) + rten(PaddleOCR) · WASM"],
-        ["PC와 다른 점", "표지 검출 1회(PC 6회) · 글자 방향은 굵은 글자 상자 2개로 판단(PC 6개)"]],
+        ["PC와 다른 점", "글자 방향은 굵은 글자 상자 2개로 판단(PC 6개)"]],
   };
   // ---- Liber(β1 · Liber-lite): PC 노트북(liber_deprehensus.ipynb)에서 검증한 Liber의 글자 쪽 단계를 새 모델 없이 옮긴 것
   //  ① 책 검출은 최종모델(E)의 통합 검출기, ⑧ 글자 인식은 TrOCR 대신 PP-OCRv5를 빌려 쓰고
   //  ⑥ 줄마다 방향(90°·180°·세로쓰기) 선택 · ⑦ 회전 사각형 펴기 + 여백 + CLAHE · ⑨ 규칙 + 글자 5-gram 교정 + 카탈로그 매칭은 Liber 그대로
   const LIBER_ST = { ok: "β1 적용", sub: "대체 사용", todo: "β2 예정", hard: "β3 검토" };
   const LIBER_SPEC = [
-    ["① 책 검출", "YOLO11n-OBB (Liber 본학습)", "ok", "1~3권 사진 보강 · Colab 본학습 · 최종모델(E)과 같은 검출기 사용"],
+    ["① 책 검출", "YOLO11n-OBB (Liber 본학습)", "ok", "1~3권 사진 보강 · Colab 본학습 · 최종모델(E)과 같은 검출기 → 두 모델의 책 번호가 같음"],
     ["② 가짜 책 필터", "SAM 2.1 tiny", "hard", "휴대폰 속도·메모리 실측 후 결정 · 지금은 건너뜀"],
     ["③ 권수 확정", "ViT 4종 분류", "todo", "DeiT-Small(약 22MB) · 지금은 검출 결과를 그대로 권수로 사용"],
     ["④ 업스케일", "FSRCNN", "todo", "약 40KB · 지금은 원본 해상도에서 자름"],
@@ -2757,22 +2767,78 @@ if (typeof module !== "undefined") module.exports = ER;
   $("f_ok").addEventListener("click", () => setFilter("ok"));
   $("f_no").addEventListener("click", () => setFilter("no"));
 
+  // ---- 최종모델(E) · Liber(β1) 비교표: 두 모델은 같은 검출기를 써서 책 상자가 같음 → 상자가 겹치는 책끼리 한 줄로
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const srcName = (b) => ({ "카탈로그": "카탈로그 확정", "OCR": "글자로 읽음", "스프링 노트": "스프링 노트" }[b.source] || "");
+  const titleOf = (b) => (b && b.final && b.final !== "Unknown" ? b.final : null);
+  function sameTitle(a, b) {
+    const x = SP.normalize(a), y = SP.normalize(b);
+    return x === y || (x.length >= 2 && y.length >= 2 && SP.ratio(SP.toJamo(x), SP.toJamo(y)) >= 90);
+  }
+  function pairBooks(E, L) {   // 상자 IoU가 가장 큰 짝부터 (0.3 이상), 짝 없는 책은 혼자 한 줄
+    const iou = (a, b) => { const w = Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])), h = Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1])), i = w * h; return i / Math.max(1e-6, (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - i); };
+    const cand = [];
+    E.books.forEach((e, i) => L.books.forEach((l, j) => { const v = iou(e.bbox, l.bbox); if (v >= 0.3) cand.push([v, i, j]); }));
+    cand.sort((a, b) => b[0] - a[0]);
+    const ue = new Set(), ul = new Set(), pairs = [];
+    for (const [, i, j] of cand) if (!ue.has(i) && !ul.has(j)) { ue.add(i); ul.add(j); pairs.push([i, j]); }
+    E.books.forEach((_, i) => { if (!ue.has(i)) pairs.push([i, null]); });
+    L.books.forEach((_, j) => { if (!ul.has(j)) pairs.push([null, j]); });
+    return pairs.sort((a, b) => (a[0] ?? a[1] + 0.5) - (b[0] ?? b[1] + 0.5));
+  }
+  function renderELCompare() {
+    const E = AB.E, L = AB.L;
+    $("elCmp").hidden = false;
+    if (!E || !L) {
+      const miss = !E ? "E" : "L";
+      $("elNote").textContent = `${CONFIGS[miss].label} 결과가 아직 없습니다. 아래 버튼을 누르면 같은 사진을 인식해 비교표를 만듭니다.`;
+      $("elRun").hidden = false; $("elRun").textContent = `${CONFIGS[miss].label}로도 인식해 비교하기`; $("elRun").dataset.model = miss;
+      $("elSumWrap").hidden = $("elTblWrap").hidden = $("elCopy").hidden = true;
+      return;
+    }
+    $("elRun").hidden = true; $("elSumWrap").hidden = $("elTblWrap").hidden = $("elCopy").hidden = false;
+    const stat = (X) => { const c = X.books.filter((b) => b.source === "카탈로그").length, o = X.books.filter((b) => b.source === "OCR").length;
+      return [X.books.length + "권", c + o + "권", c + "권", o + "권", (X.tAll / 1000).toFixed(1) + "초", X.calls + "회"]; };
+    const se = stat(E), sl = stat(L);
+    $("elSum").innerHTML = ["감지된 책", "제목 확인", "· 카탈로그 확정", "· 글자로 읽은 제목", "전체 소요시간", "글자 인식 호출"]
+      .map((k, i) => `<tr><td>${k}</td><td class="n">${se[i]}</td><td class="n">${sl[i]}</td></tr>`).join("");
+    const rows = pairBooks(E, L).map(([i, j]) => {
+      const e = i === null ? null : E.books[i], l = j === null ? null : L.books[j], te = titleOf(e), tl = titleOf(l), b = e || l;
+      const verdict = !e || !l ? ["한쪽만 검출", "diff"] : te && tl ? (sameTitle(te, tl) ? ["같음", "same"] : ["다름", "diff"])
+        : te ? ["E만 인식", "diff"] : tl ? ["Liber만 인식", "diff"] : ["둘 다 미인식", "none"];
+      return { no: i !== null ? i + 1 : `L${j + 1}`, kind: b.kind === "cover" ? "표지" : "책등", e, l, te, tl, verdict };
+    });
+    const cell = (b, t) => (!b ? `<td class="none">검출 안 됨</td>` : `<td>${t ? esc(t) : "미인식"}<small>${srcName(b)}</small></td>`);
+    $("elBody").innerHTML = rows.map((r) => `<tr><td class="n">${r.no}</td><td>${r.kind}</td>${cell(r.e, r.te)}${cell(r.l, r.tl)}<td class="${r.verdict[1]}">${r.verdict[0]}</td></tr>`).join("");
+    const n = (v) => rows.filter((r) => r.verdict[0] === v).length;
+    $("elNote").textContent = `책 ${rows.length}권: 같음 ${n("같음")} · 다름 ${n("다름")} · E만 인식 ${n("E만 인식")} · Liber만 인식 ${n("Liber만 인식")} · 둘 다 미인식 ${n("둘 다 미인식")}` + (n("한쪽만 검출") ? ` · 한쪽만 검출 ${n("한쪽만 검출")}` : "");
+    AB.elRows = rows;
+  }
+  $("elRun").addEventListener("click", () => openModel($("elRun").dataset.model));
+  $("elCopy").addEventListener("click", async () => {   // 보고서·스프레드시트에 붙여 넣기 좋게 탭 구분
+    const lines = [["번호", "종류", "최종모델(E)", "E 출처", "Liber(β1)", "Liber 출처", "비교"].join("\t")]
+      .concat((AB.elRows || []).map((r) => [r.no, r.kind, r.te || (r.e ? "미인식" : "검출 안 됨"), r.e ? srcName(r.e) : "", r.tl || (r.l ? "미인식" : "검출 안 됨"), r.l ? srcName(r.l) : "", r.verdict[0]].join("\t")));
+    try { await navigator.clipboard.writeText(lines.join("\n")); $("elCopy").textContent = "복사됨"; setTimeout(() => ($("elCopy").textContent = "비교표 복사"), 1500); }
+    catch (_) { $("elCopy").textContent = "복사 실패"; }
+  });
+
   function renderModel(M) {
     const R = AB[M]; if (!R) return;
     AB.view = M;
-    for (const k of ["A", "B", "D", "E", "L"]) { const t = $("tab" + k); t.classList.toggle("on", k === M); t.setAttribute("aria-selected", String(k === M)); }
+    for (const k of ["D", "E", "L"]) { const t = $("tab" + k); t.classList.toggle("on", k === M); t.setAttribute("aria-selected", String(k === M)); }
     $("cv").hidden = false;
     $("spec").innerHTML = M === "L" ? liberSpecHtml() : `<dt class="h">${CONFIGS[M].label} 적용 모델</dt>` + SPEC[M].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
     const f = AB.filter || "all";
     redraw(); renderList(R.rows, f); $("res").hidden = false;
     $("cmp").innerHTML = "";
-    for (const k of ["E", "L", "A", "B", "D"]) {
+    for (const k of ["E", "L", "D"]) {
       const X = AB[k]; if (!X) continue;
       const d = document.createElement("div"); if (k === M) d.className = "on";
       const ok = X.rows.filter((r) => r.title).length, n = X.boxes.length, sec = (ms) => (ms / 1000).toFixed(2);
       d.innerHTML = `<b>${CONFIGS[k].label}</b><dl class="kv2"><dt>감지된 책(권)</dt><dd>${n}</dd><dt>제목 확인된 책(권)</dt><dd>${ok}</dd><dt>1권당 검출 시간(초)</dt><dd>${n ? sec(X.tAll / n) : "-"}</dd><dt>전체 소요시간(초)</dt><dd>${sec(X.tAll)}</dd></dl>`;
       $("cmp").appendChild(d);
     }
+    renderELCompare();
   }
   // 탭을 처음 누르면 같은 사진을 그 모델로 인식
   async function openModel(M) {
@@ -2786,7 +2852,7 @@ if (typeof module !== "undefined") module.exports = ER;
     }
     renderModel(M);
   }
-  for (const M of ["A", "B", "D", "E", "L"]) $("tab" + M).addEventListener("click", () => openModel(M));
+  for (const M of ["D", "E", "L"]) $("tab" + M).addEventListener("click", () => openModel(M));
   async function saveRun(M) {
     try {
       const db = await claude.use("db"); if (!db) return; const X = AB[M];
@@ -2851,7 +2917,8 @@ if (typeof module !== "undefined") module.exports = ER;
   });
   function reset1() {
     if (busy) return;
-    AB.A = AB.B = AB.D = AB.E = AB.L = AB.img = AB.src = null; AB.view = "E"; AB.eView = 3;
+    AB.A = AB.B = AB.D = AB.E = AB.L = AB.img = AB.src = null; AB.view = "E"; AB.eView = 3; AB.elRows = null;
+    $("elCmp").hidden = true;
     for (const [j, w] of [["ev1", 1], ["ev2", 2], ["ev3", 3]]) { $(j).classList.toggle("on", w === 3); $(j).setAttribute("aria-selected", String(w === 3)); }
     $("eViews").hidden = true; $("cvCap").hidden = true; $("cvLeg").hidden = true;
     $("abWrap").hidden = true; $("cv").hidden = true; $("res").hidden = true; $("rList").innerHTML = ""; $("cmp").innerHTML = ""; $("dst").hidden = false;
