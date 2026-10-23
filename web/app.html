@@ -941,7 +941,7 @@ const DEVICES = [
 ].map(([group, name, chip, ram, year, reported]) => ({ group, name, chip, ram, year, reported: !!reported }));
 
 // 앱 버전: 최종 제출 전까지 0.x 유지, 패치마다 0.10 → 0.11 → 0.12 … 로 하나씩 올림
-const APP_VERSION = "0.18", APP_UPDATED = "2026-10-23 12:59 (KST)";
+const APP_VERSION = "0.19", APP_UPDATED = "2026-10-23 13:03 (KST)";
 
 // 최종모델(E) 용량 · 메모리 (MB). 검출기는 직접 학습한 YOLO11n-OBB (책등·표지 2클래스, 40에포크)
 const MODEL_INFO = {
@@ -2634,11 +2634,16 @@ if (typeof module !== "undefined") module.exports = ER;
     const ratio = kind === "cover" ? R.coverRatio : R.sizeRatio, maxT = kind === "cover" ? R.coverMaxTitle : R.maxTitle;
     const nums = lines.filter((L) => L.num && top && size(L) >= R.numRatio * top);
     const pick = read.filter((L) => size(L) >= ratio * top).sort((a, b) => size(b) - size(a)).slice(0, maxT).concat(nums);
-    // 줄 순서 = 글자를 바로 세운 뒤의 위→아래. 크롭이 뒤집혀(180°) 있거나 옆으로(90°) 누워 있으면 위치도 같이 돌려서 정렬
-    const cnt = {}; for (const L of pick) cnt[L.o] = (cnt[L.o] || 0) + 1;
-    const o = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0];
-    const key = (L) => (o === "180" ? [-L.r.cy, -L.r.cx] : o === "cw" ? [L.r.cx, -L.r.cy] : o === "ccw" ? [-L.r.cx, L.r.cy] : [L.r.cy, L.r.cx]);
-    const sel = pick.sort((a, b) => { const ka = key(a), kb = key(b); return ka[0] - kb[0] || ka[1] - kb[1]; });
+    // 줄 순서 = 글자를 바로 세운 뒤의 위→아래. 글자를 바로 세운 총 회전각 θ = (줄을 펼 때 −각도) + (고른 방향)
+    //  가장 큰 제목 줄의 θ로 모든 줄 위치를 돌려서 정렬 (크롭이 뒤집혀 있거나 옆으로 누워 있어도 읽는 순서가 맞게)
+    const DELTA = { "0": 0, "180": Math.PI, cw: Math.PI / 2, ccw: -Math.PI / 2, stack: 0 };
+    const lead = pick.length ? pick.reduce((a, b) => (size(b) > size(a) ? b : a)) : null;
+    const th = lead ? -lead.r.ang + (DELTA[lead.o] || 0) : 0, c = Math.cos(th), sn = Math.sin(th);
+    const up = (L) => [sn * L.r.cx + c * L.r.cy, c * L.r.cx - sn * L.r.cy];   // 바로 세운 뒤의 (세로, 가로) 위치
+    const sel = pick.sort((a, b) => {
+      const ka = up(a), kb = up(b), tol = 0.5 * Math.min(size(a), size(b));
+      return Math.abs(ka[0] - kb[0]) > tol ? ka[0] - kb[0] : ka[1] - kb[1];
+    });
     const titleLines = sel.map((L) => L.text), raw = titleLines.join(" ");
     const fixed = titleLines.map(libCorrectLine), spatial = fixed.join(" "), reordered = libBestOrder(fixed).join(" ");
     const catScore = (q) => { const m = q ? matcher.match(q, 1, true) : []; return m.length && m[0].verified !== false ? m[0].score : 0; };
