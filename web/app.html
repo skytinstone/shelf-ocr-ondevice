@@ -102,6 +102,11 @@ select {
 .rtline { margin: 12px 2px 0; font-size: .74rem; color: var(--sub); display: flex; align-items: center; gap: 6px; }
 .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); display: inline-block; }
 .dot.ready { background: var(--ok); } .dot.err { background: var(--bad); }
+.mlabel { margin: 14px 2px 6px; font-size: .78rem; font-weight: 600; color: var(--sub); }
+.mlabel:first-of-type { margin-top: 0; }
+.mpick { margin: 0 0 6px; }
+.mpick .tab:disabled { opacity: .35; }
+.mdesc2 { margin: 0 2px 4px; font-size: .8rem; color: var(--sub); min-height: 1.3em; }
 .lockmsg { display: none; margin: 0 0 10px; font-size: .84rem; font-weight: 600; color: var(--sub); }
 .step.locked .lockmsg { display: block; }
 .step.locked > :not(h2):not(.lockmsg) { opacity: .35; pointer-events: none; user-select: none; filter: saturate(.6); }
@@ -244,12 +249,20 @@ select {
   <section class="step locked" id="sec2">
     <h2>책 인식</h2>
     <p class="lockmsg">먼저 기기를 선택하고 RAM 적합성을 확인해 주세요.</p>
+    <p class="mlabel">인식 모델</p>
+    <div class="tabs tabs3 mpick" id="mPick" role="tablist" aria-label="인식 모델 선택">
+      <button type="button" role="tab" class="tab" data-m="L" aria-selected="false">β1 · 빠름</button>
+      <button type="button" role="tab" class="tab on" data-m="L2" aria-selected="true">β2 · 정확</button>
+      <button type="button" role="tab" class="tab" data-m="both" aria-selected="false">β1·β2 비교</button>
+    </div>
+    <p class="mdesc2" id="mDesc"></p>
+    <p class="mlabel">사진</p>
     <div class="row">
       <label class="file-btn">사진 찍기<input id="cam" type="file" accept="image/*" capture="environment"></label>
       <label class="file-btn ghost">보관함<input id="lib" type="file" accept="image/*"></label>
       <button id="reset1" type="button" class="ghost">초기화</button>
     </div>
-    <p class="status" id="dst">사진을 넣으면 β1로 인식하고, β2 탭에서 같은 사진을 비교합니다.</p>
+    <p class="status" id="dst">모델을 고른 뒤 사진을 넣으면 바로 인식합니다.</p>
     <div id="abWrap" hidden>
       <div class="tabs tabs3" role="tablist">
         <button type="button" role="tab" id="tabL" class="tab on" aria-selected="true">Liber(β1)</button>
@@ -1027,7 +1040,7 @@ const DEVICES = [
 ].map(([group, name, chip, ram, year, reported]) => ({ group, name, chip, ram, year, reported: !!reported }));
 
 // 앱 버전: 최종 제출 전까지 0.x 유지, 패치마다 0.10 → 0.11 → 0.12 … 로 하나씩 올림
-const APP_VERSION = "0.29", APP_UPDATED = "2026-10-24 13:00 (KST)";
+const APP_VERSION = "0.30", APP_UPDATED = "2026-10-24 13:40 (KST)";
 
 // 최종모델(E) 용량 · 메모리 (MB). 검출기는 직접 학습한 YOLO11n-OBB (책등·표지 2클래스, 40에포크)
 const MODEL_INFO = {
@@ -2100,23 +2113,28 @@ if (typeof module !== "undefined") module.exports = ER;
     if (navigator.deviceMemory) return { gb: navigator.deviceMemory, src: "브라우저 보고값" };
     return null;
   }
+  // 모델별 필요 메모리: β1 = 검출기 + 글자 모델 · β2 = β1 + 권수 확정·업스케일·TrOCR(한 언어)
+  const needOf = (M) => Math.round(MODEL_INFO.unifiedPeak + (MODEL_INFO.others + (M === "L2" ? MODEL_INFO.liber2 : 0)) * 3 + MODEL_INFO.runtime + MODEL_INFO.imageBuf);
+  function setModelAvail(okL2) {   // β2가 허용 메모리를 넘으면 β2·비교를 잠그고 β1로
+    for (const b of document.querySelectorAll("#mPick .tab")) if (b.dataset.m !== "L") b.disabled = !okL2;
+    if (!okL2 && AB.pick !== "L") pickModel("L");
+  }
   function checkFit() {
     const d = DEVICES.find((x) => x.name === $("dPick").value); if (!d) return;
-    const r = ramOf(d), el = $("fitRes"), need = MODEL_INFO.peak;
+    const r = ramOf(d), el = $("fitRes"), n1 = needOf("L"), n2 = needOf("L2");
     el.hidden = false;
     if (!r) {
       el.className = "fit unk";
-      el.innerHTML = `<b>RAM 정보가 없어 판단할 수 없습니다</b><small>필요 메모리 약 ${need}MB · 실행 중 브라우저가 멈추면 다른 앱을 닫고 다시 시도해 주세요. 다음 단계는 진행할 수 있습니다.</small>`;
-      setLocked(false); return;
+      el.innerHTML = `<b>RAM 정보가 없어 판단할 수 없습니다</b><small>필요 메모리 β1 약 ${n1}MB · β2 약 ${n2}MB. 실행 중 멈추면 다른 앱을 닫고 다시 시도해 주세요.</small>`;
+      setModelAvail(true); setLocked(false); return;
     }
-    const allow = r.gb * 1024 * RAM_BUDGET, ok = need <= allow, pct = Math.min(100, (need / allow) * 100);
-    el.className = "fit " + (ok ? "pass" : "fail");
-    el.innerHTML = `<b>${ok ? "적합: 허용 메모리 안에 들어갑니다" : "부적합: 허용 메모리를 넘습니다"}</b>` +
+    const allow = r.gb * 1024 * RAM_BUDGET, ok1 = n1 <= allow, ok2 = n2 <= allow, pct = Math.min(100, (n2 / allow) * 100);
+    el.className = "fit " + (ok2 ? "pass" : ok1 ? "unk" : "fail");
+    el.innerHTML = `<b>${ok2 ? "적합: β1 · β2 모두 실행할 수 있습니다" : ok1 ? "β1만 실행할 수 있습니다" : "부적합: 허용 메모리를 넘습니다"}</b>` +
       `<div class="meter"><i style="width:${pct.toFixed(0)}%"></i></div>` +
-      `<span>필요 약 ${need}MB / 허용 ${mb(allow)} (RAM ${r.gb}GB × ${RAM_BUDGET * 100}%, ${r.src}) · 사용률 ${((need / allow) * 100).toFixed(0)}%</span>` +
-      `<small>${ok ? "다음 단계로 진행합니다." : "이 기기에서는 실행 중 브라우저가 종료될 수 있어 다음 단계를 잠가 두었습니다."}</small>`;
-    setLocked(!ok);
-    if (ok) $("sec2").scrollIntoView({ behavior: "smooth", block: "start" });
+      `<span>허용 ${mb(allow)} (RAM ${r.gb}GB × ${RAM_BUDGET * 100}%) · β1 약 ${n1}MB ${ok1 ? "✓" : "✕"} · β2 약 ${n2}MB ${ok2 ? "✓" : "✕"}</span>`;
+    setModelAvail(ok2); setLocked(!ok1);
+    if (ok1) $("sec2").scrollIntoView({ behavior: "smooth", block: "start" });
   }
   $("fitBtn").addEventListener("click", checkFit);
   let pickedDev;
@@ -3336,6 +3354,17 @@ if (typeof module !== "undefined") module.exports = ER;
   }
 
   let busy = false;
+  // 인식 모델 선택: L = β1 · L2 = β2 · both = β1 → β2 연속 실행 후 비교
+  const MDESC = { L: "검출 + 글자 인식만 실행 · 37MB · 가장 빠름",
+                  L2: "권수 확정 · 업스케일 · 보조 인식 추가 · 61MB · 멀리서 찍은 작은 글씨에 강함",
+                  both: "같은 사진을 β1 → β2로 차례로 인식해 비교표를 만듭니다 · 시간 약 2배" };
+  function pickModel(m) {
+    if (busy) return; AB.pick = m;
+    for (const b of document.querySelectorAll("#mPick .tab")) { const on = b.dataset.m === m; b.classList.toggle("on", on); b.setAttribute("aria-selected", String(on)); }
+    $("mDesc").textContent = MDESC[m];
+  }
+  for (const b of document.querySelectorAll("#mPick .tab")) b.addEventListener("click", () => pickModel(b.dataset.m));
+  pickModel("L2");
   async function recognize(src) {
     if (busy) return; busy = true;
     let wake = null; try { wake = await navigator.wakeLock?.request("screen"); } catch (_) {}
@@ -3346,10 +3375,11 @@ if (typeof module !== "undefined") module.exports = ER;
       const img = mk(Math.round(iw * k), Math.round(ih * k)); img.getContext("2d").drawImage(src, 0, 0, img.width, img.height);
       AB.img = img; AB.src = src;   // src: 원본 사진 (글자 읽기용 크롭)
       AB.filter = "all";
-      AB.L = await computeL(img, 0, 1);
-      $("abWrap").hidden = false; $("cv").hidden = false; AB.eView = 3; renderModel("L");
+      const pick = AB.pick || "L2";
+      if (pick === "both") { AB.L = await computeL(img, 0, 0.45); AB.L2 = await computeL(img, 0.45, 1, true); }
+      else AB[pick] = await computeL(img, 0, 1, pick === "L2");
+      $("abWrap").hidden = false; $("cv").hidden = false; AB.eView = 3; renderModel(pick === "L" ? "L" : "L2");
       $("dst").hidden = true;
-      saveRun("L");
     } catch (e) { logError($("pmStep").textContent, e); $("dst").hidden = false; $("dst").textContent = `인식 실패 [${$("pmStep").textContent}] ${e && e.message ? e.message : e} · 아래 실행 로그를 확인해 주세요`; }
     finally { hideProgress(); try { await wake?.release(); } catch (_) {} busy = false; $("abWrap").scrollIntoView({ block: "start", behavior: "smooth" }); }
   }
@@ -3370,7 +3400,7 @@ if (typeof module !== "undefined") module.exports = ER;
     for (const [j, w] of [["ev1", 1], ["ev2", 2], ["ev3", 3]]) { $(j).classList.toggle("on", w === 3); $(j).setAttribute("aria-selected", String(w === 3)); }
     $("eViews").hidden = true; $("cvCap").hidden = true; $("cvLeg").hidden = true;
     $("abWrap").hidden = true; $("cv").hidden = true; $("res").hidden = true; $("rList").innerHTML = ""; $("cmp").innerHTML = ""; $("dst").hidden = false;
-    $("dst").textContent = "사진을 넣으면 β1로 인식하고, β2 탭에서 같은 사진을 비교합니다.";
+    $("dst").textContent = "모델을 고른 뒤 사진을 넣으면 바로 인식합니다.";
   }
   $("reset1").addEventListener("click", reset1);
   $("reset2").addEventListener("click", () => {
