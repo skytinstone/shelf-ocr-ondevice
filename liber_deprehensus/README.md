@@ -1,4 +1,4 @@
-# Liber Deprehensus
+# Liber OCR
 
 책장 사진 한 장에서 **책 권수**와 **책 제목**을 뽑아내는 On-Device 모델입니다.
 모든 단계가 휴대폰 브라우저 안에서 실행되며, **LLM·멀티모달 대화형 모델은 쓰지 않습니다.**
@@ -25,15 +25,15 @@
 
 설계한 전체 구조 (권수 추출 Sub-Model 1 + 제목 추출 Sub-Model 2):
 
-<p align="center"><img src="assets/architecture.png" alt="Liber 아키텍처" width="560"></p>
+<p align="center"><img src="assets/architecture.png" alt="Liber OCR 아키텍처" width="560"></p>
 
 웹(On-Device)에 실제로 올린 사양과 버전별 적용 범위:
 
-<p align="center"><img src="assets/liber_spec.png" alt="Liber On-Device 사양" width="760"></p>
+<p align="center"><img src="assets/liber_spec.png" alt="Liber OCR On-Device 사양" width="760"></p>
 
 | 단계 | 하는 일 | 모델 | β1 | β2 |
 |---|---|---|:-:|:-:|
-| ① 책 검출 | 회전 상자로 책등·표지 찾기 | YOLO11n-OBB (Liber 본학습, 960 입력, 신뢰도 0.45) | ✅ | ✅ |
+| ① 책 검출 | 회전 상자로 책등·표지 찾기 | YOLO11n-OBB (Liber OCR 본학습, 960 입력, 신뢰도 0.45) | ✅ | ✅ |
 | ② 가짜 책 필터 | 마스크로 가짜 상자 거르기 | SAM 2.1 tiny | PC만 | PC만 |
 | ③ 권수 확정 | book / not_book / partial / multiple 판정 → 나누기·합치기·버리기 | DeiT-Small (PC는 ViT-Large) | – | ✅ |
 | ④ 업스케일 | 폭이 좁은 책등만 2~4배 | FSRCNN | – | ✅ |
@@ -142,7 +142,7 @@
 | 실제 시험 6장 (웹 규칙 포함) | 권수 오차 합 10 → **11** · 처리 시간 97.1초 → **100.6초**(+3.6%) · 인식 호출 683 → 704회 |
 | 결론 | **감지 성능과 처리 시간이 오히려 나빠져 반려** → 본학습 검출기 유지 |
 
-원인: 실제 사진 라벨이 15장뿐이라 양이 부족했고, 학습 후 사진 가장자리의 배경 띠를 책으로 잡는 경우가 새로 생겼습니다. SAM 3는 **라벨링 보조 도구로만** 썼고 Liber 추론에는 들어가지 않습니다.
+원인: 실제 사진 라벨이 15장뿐이라 양이 부족했고, 학습 후 사진 가장자리의 배경 띠를 책으로 잡는 경우가 새로 생겼습니다. SAM 3는 **라벨링 보조 도구로만** 썼고 Liber OCR 추론에는 들어가지 않습니다.
 
 ### 2-a. 합성 사진 미세조정 (채택 안 함)
 

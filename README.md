@@ -1,4 +1,4 @@
-# Liber Deprehensus
+# Liber OCR
 
 책장 사진 한 장에서 **책 권수**와 **책 제목**을 뽑아내는 On-Device 모델입니다.
 모든 단계가 휴대폰 브라우저 안에서 실행되며, **LLM·멀티모달 대화형 모델은 쓰지 않습니다.**
@@ -25,15 +25,15 @@
 
 설계한 전체 구조 (권수 추출 Sub-Model 1 + 제목 추출 Sub-Model 2):
 
-<p align="center"><img src="liber_deprehensus/assets/architecture.png" alt="Liber 아키텍처" width="560"></p>
+<p align="center"><img src="liber_deprehensus/assets/architecture.png" alt="Liber OCR 아키텍처" width="560"></p>
 
 웹(On-Device)에 실제로 올린 사양과 버전별 적용 범위:
 
-<p align="center"><img src="liber_deprehensus/assets/liber_spec.png" alt="Liber On-Device 사양" width="760"></p>
+<p align="center"><img src="liber_deprehensus/assets/liber_spec.png" alt="Liber OCR On-Device 사양" width="760"></p>
 
 | 단계 | 하는 일 | 모델 | β1 | β2 |
 |---|---|---|:-:|:-:|
-| ① 책 검출 | 회전 상자로 책등·표지 찾기 | YOLO11n-OBB (Liber 본학습, 960 입력, 신뢰도 0.45) | ✅ | ✅ |
+| ① 책 검출 | 회전 상자로 책등·표지 찾기 | YOLO11n-OBB (Liber OCR 본학습, 960 입력, 신뢰도 0.45) | ✅ | ✅ |
 | ② 가짜 책 필터 | 마스크로 가짜 상자 거르기 | SAM 2.1 tiny | PC만 | PC만 |
 | ③ 권수 확정 | book / not_book / partial / multiple 판정 → 나누기·합치기·버리기 | DeiT-Small (PC는 ViT-Large) | – | ✅ |
 | ④ 업스케일 | 폭이 좁은 책등만 2~4배 | FSRCNN | – | ✅ |
@@ -142,7 +142,7 @@
 | 실제 시험 6장 (웹 규칙 포함) | 권수 오차 합 10 → **11** · 처리 시간 97.1초 → **100.6초**(+3.6%) · 인식 호출 683 → 704회 |
 | 결론 | **감지 성능과 처리 시간이 오히려 나빠져 반려** → 본학습 검출기 유지 |
 
-원인: 실제 사진 라벨이 15장뿐이라 양이 부족했고, 학습 후 사진 가장자리의 배경 띠를 책으로 잡는 경우가 새로 생겼습니다. SAM 3는 **라벨링 보조 도구로만** 썼고 Liber 추론에는 들어가지 않습니다.
+원인: 실제 사진 라벨이 15장뿐이라 양이 부족했고, 학습 후 사진 가장자리의 배경 띠를 책으로 잡는 경우가 새로 생겼습니다. SAM 3는 **라벨링 보조 도구로만** 썼고 Liber OCR 추론에는 들어가지 않습니다.
 
 ### 2-a. 합성 사진 미세조정 (채택 안 함)
 
@@ -273,7 +273,7 @@ Block마다 ✅ 확인 셀이 [통과 전 | 통과 후] 그림을 보여 줍니�
 ```
 shelf_ocr_test/
 ├── web/                    # On-Device 웹앱 (app.html 한 파일 + 웹용 모델) · GitHub Pages로 배포
-├── liber_deprehensus/      # Liber 모델: PC 노트북(Block 1~9) · Colab 학습 노트북 · 사양 이미지
+├── liber_deprehensus/      # Liber OCR 모델: PC 노트북(Block 1~9) · Colab 학습 노트북 · 사양 이미지
 ├── eval/                   # 시험 세트 정답(gt.json · books_gt.json) · 평가 사진
 ├── catalog/ · gt/ · images/ · src/ · tools/   # 이전 PC 비교 실험 (아래)
 └── shelf_ocr_test.ipynb    # 이전 PC 비교 실험 노트북
@@ -281,7 +281,7 @@ shelf_ocr_test/
 
 ## 이전 실험: PC 비교 파이프라인 (shelf_ocr_test)
 
-Liber 이전에 PC에서 검출·OCR 엔진을 비교하던 실험입니다. Liber β1의 제목 규칙과 검출 규칙의 바탕이 됐습니다.
+Liber OCR 이전에 PC에서 검출·OCR 엔진을 비교하던 실험입니다. Liber OCR β1의 제목 규칙과 검출 규칙의 바탕이 됐습니다.
 
 - 노트북: `shelf_ocr_test.ipynb` (2번 셀부터 실행, 2-1번 셀에서 사진·정답 추가)
 - 책 검출: 책등 YOLO11n-OBB + 표지 YOLO11x COCO `book` 후보를 규칙으로 정리
