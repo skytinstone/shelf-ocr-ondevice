@@ -11,7 +11,7 @@ function isMobileOrTablet() {
 }
 if (!isMobileOrTablet()) { if (window.stop) window.stop(); location.replace("./"); }
 </script>
-<title>KT 밀리의서재 · AI Engineer 사전과제</title>
+<title>On-Device 책 권수·제목 추출 데모</title>
 <style>
 /* Liquid Glass: 반투명 유리 카드 · 알약형 버튼 · 세그먼트 탭 · 은은한 그라데이션 배경 (라이트/다크) */
 :root {
@@ -238,8 +238,8 @@ select {
 
 <div class="wrap">
   <header>
-    <h1><span>KT 밀리의서재</span><span>AI Engineer 사전과제</span></h1>
-    <p class="who">LLM 탑재 제외 등 필수 요구 사항 모두 반영한 시스템</p>
+    <h1><span>On-Device OCR 데모</span><span>책 권수·제목 추출</span></h1>
+    <p class="who">LLM 없이 휴대폰 안에서 동작하는 비전 시스템</p>
     <p class="ver" id="appVer"></p>
     <p class="brnote" id="brNote" hidden>이 데모는 <b>Chrome</b>에 최적화되어 있습니다.</p>
     <p class="lede">책장 사진 한 장으로 책 권수와 제목을 찾습니다. 사진은 기기 밖으로 나가지 않습니다.</p>
@@ -1062,7 +1062,7 @@ const DEVICES = [
 ].map(([group, name, chip, ram, year, reported]) => ({ group, name, chip, ram, year, reported: !!reported }));
 
 // 앱 버전: 최종 제출 전까지 0.x 유지, 패치마다 0.10 → 0.11 → 0.12 … 로 하나씩 올림
-const APP_VERSION = "0.32", APP_UPDATED = "2026-10-24 14:30 (KST)";
+const APP_VERSION = "0.33", APP_UPDATED = "2026-10-24 15:00 (KST)";
 
 // 최종모델(E) 용량 · 메모리 (MB). 검출기는 직접 학습한 YOLO11n-OBB (책등·표지 2클래스, 40에포크)
 const MODEL_INFO = {
